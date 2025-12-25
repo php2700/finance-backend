@@ -12,8 +12,8 @@ export const sendOtpMail = async (email, otp) => {
   await transporter.sendMail({
     from: '"Xpenly Team" <no-reply@xpenly.com>',
 
-    // 👇 Dummy receiver email (testing ke liye)
-    to: 'nodedb9@gmail.com',
+    // ✅ USER KI EMAIL (DYNAMIC)
+    to: email,
 
     subject: '🔐 Your Xpenly OTP Verification Code',
 

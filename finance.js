@@ -24,7 +24,7 @@ app.get('/', (req, res) => {
   res.send('API is running.... on post 3012');
 });
 
-// ✅ FIXED ERROR HANDLER
+//  FIXED ERROR HANDLER
 app.use((err, req, res, next) => {
   console.error('ERROR:', err);
 
