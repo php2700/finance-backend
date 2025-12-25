@@ -1,16 +1,13 @@
-import jwt from 'jsonwebtoken'
-import { JWT_SECRET_KEY } from '../envconfig.js';
-
-export const authentication = (req, res, next) => {
-    const token = req?.headers['authorization'].split(" ")[1];
-    if (token) {
-        const isVerifyUser = jwt.verify(token, JWT_SECRET_KEY);
-        if (isVerifyUser) {
-            req.role = isVerifyUser?.role;
-           return next();
-        }
-        return res.status(400).json({ success: false, message: 'token not valid' })
-
+export const authorization = (roles) => {
+  return (req, res, next) => {
+    if (!req.role) {
+      return res.status(401).json({ message: 'Role not found' });
     }
-    return res.status(400).json({ success: false, message: 'token not found' })
-}
+    if (roles.includes(req.role)) {
+      return next();
+    }
+    return res
+      .status(400)
+      .json({ success: false, message: 'permission denied' });
+  };
+};
