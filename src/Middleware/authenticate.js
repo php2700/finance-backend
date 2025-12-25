@@ -1,13 +1,22 @@
-export const authorization = (roles) => {
-  return (req, res, next) => {
-    if (!req.role) {
-      return res.status(401).json({ message: 'Role not found' });
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET_KEY } from '../envconfig.js';
+
+export const authentication = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Token missing' });
     }
-    if (roles.includes(req.role)) {
-      return next();
-    }
-    return res
-      .status(400)
-      .json({ success: false, message: 'permission denied' });
-  };
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET_KEY);
+
+    req.userId = decoded.id;
+    req.role = decoded.role;
+
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: 'Invalid token' });
+  }
 };
