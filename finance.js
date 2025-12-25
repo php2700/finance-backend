@@ -24,10 +24,14 @@ app.get('/', (req, res) => {
   res.send('API is running....');
 });
 
+// ✅ FIXED ERROR HANDLER
 app.use((err, req, res, next) => {
-  res
-    .status(res.status || 500)
-    .json({ success: true, message: err?.message || 'something went wrong' });
+  console.error('ERROR:', err);
+
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || 'Something went wrong',
+  });
 });
 
 app.listen(PORT, () => {
