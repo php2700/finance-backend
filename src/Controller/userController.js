@@ -93,3 +93,15 @@ export const addUserName = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getAllUsers = async (req, res, next) => {
+  try {
+    const users = await User.find().select('-otp -otpExpire');
+    res.status(200).json({
+      success: true,
+      users,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
