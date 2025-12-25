@@ -21,7 +21,7 @@ app.use('/uploads', express.static('public/uploads'));
 app.use('/api/admin', adminRouter);
 app.use('/api/user', userRouter);
 app.get('/', (req, res) => {
-  res.send('API is running....');
+  res.send('API is running.... on post 3012');
 });
 
 //  FIXED ERROR HANDLER
