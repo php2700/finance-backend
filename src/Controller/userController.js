@@ -1,5 +1,5 @@
 import TransactionModel from '../Models/transaction.js';
-
+import { isValidEmail } from '../utils/validateEmail.js';
 import User from '../Models/userModel.js';
 import { generateOtp } from '../utils/generateOtp.js';
 import { sendOtpMail } from '../utils/sendMail.js';
@@ -21,6 +21,13 @@ export const AddTransction = async (req, res, next) => {
 export const sendOtp = async (req, res, next) => {
   try {
     const { email } = req.body;
+    // ❌ Invalid email format
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email address',
+      });
+    }
 
     let user = await User.findOne({ email });
 
@@ -96,6 +103,7 @@ export const addUserName = async (req, res, next) => {
 
 export const getAllUsers = async (req, res, next) => {
   try {
+    console.log('🔥 GET /api/user hit');
     const users = await User.find().select('-otp -otpExpire');
     res.status(200).json({
       success: true,
