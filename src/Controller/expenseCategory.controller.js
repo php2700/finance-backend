@@ -12,8 +12,14 @@ export const createExpenseCategory = async (req, res) => {
     if (exists)
       return res.status(400).json({ message: 'Category already exists' });
 
+    let image = null;
+    if (req.file) {
+      image = `/uploads/expense-category/${req.file.filename}`;
+    }
+
     const category = await ExpenseCategory.create({
       name,
+      image,
       createdBy: req.user?._id,
     });
 
@@ -48,6 +54,9 @@ export const updateExpenseCategory = async (req, res) => {
     const category = await ExpenseCategory.findById(id);
     if (!category)
       return res.status(404).json({ message: 'Category not found' });
+    if (req.file) {
+      category.image = `/uploads/expense-category/${req.file.filename}`;
+    }
 
     if (name !== undefined) category.name = name;
     if (status !== undefined) category.status = status;
