@@ -1,4 +1,5 @@
 import express from 'express';
+import upload from '../Middleware/upload.js';
 const router = express.Router();
 import {
   createExpenseCategory,
@@ -10,13 +11,13 @@ import {
 /* ================= ROUTES ================= */
 
 // Create
-router.post('/', createExpenseCategory);
+router.post('/', upload.single('image'), createExpenseCategory);
 
 // Read
 router.get('/', getExpenseCategories);
 
 // Update
-router.put('/:id', updateExpenseCategory);
+router.put('/:id', upload.single('image'), updateExpenseCategory);
 
 // Delete
 router.delete('/:id', deleteExpenseCategory);
