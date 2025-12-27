@@ -22,7 +22,7 @@ export const AddTransction = async (req, res, next) => {
 
 export const sendOtp = async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const { email } = req.body || {};
     // ❌ Invalid email format
     if (!email || !isValidEmail(email)) {
       return res.status(400).json({
@@ -57,7 +57,7 @@ export const sendOtp = async (req, res, next) => {
 
 export const verifyOtp = async (req, res, next) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp } = req.body || {};
 
     const user = await User.findOne({ email });
 
@@ -97,7 +97,7 @@ export const verifyOtp = async (req, res, next) => {
 
 export const addUserName = async (req, res, next) => {
   try {
-    const { name } = req.body;
+    const { name } = req.body || {};
 
     if (!name) {
       return res
