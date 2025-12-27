@@ -1,19 +1,103 @@
-import TransactionModel from '../Models/transaction.js';
+import IncomeModel, { ExpenseModel, SplitModel } from '../Models/transaction.js';
 import { isValidEmail } from '../utils/validateEmail.js';
 import User from '../Models/userModel.js';
 import { generateOtp } from '../utils/generateOtp.js';
 import { sendOtpMail } from '../utils/sendMail.js';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET_KEY } from '../envconfig.js';
+import mongoose from 'mongoose';
 
-export const AddTransction = async (req, res, next) => {
+
+
+export const AddIncome = async (req, res, next) => {
   try {
-    const transaction = new TransactionModel(req.body);
+    const transaction = new IncomeModel(req.body);
     await transaction.save();
     return res.status(201).json({
       success: true,
-      message: 'Transaction added successfully',
+      message: 'Income added successfully',
       data: transaction,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const dashboard = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    const objectUserId = new mongoose.Types.ObjectId(userId);
+
+    const incomeResult = await IncomeModel.aggregate([
+      { $match: { userId: objectUserId } },
+      { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+
+    const totalIncome = incomeResult[0]?.total || 0;
+
+    const expenseResult = await ExpenseModel.aggregate([
+      { $match: { userId: objectUserId } },
+      { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+
+    const totalExpense = expenseResult[0]?.total || 0;
+
+    const splitResult = await SplitModel.aggregate([
+      { $match: { userId: objectUserId } },
+      { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+
+    const totalSplit = splitResult[0]?.total || 0;
+    const total = totalIncome - totalExpense - totalSplit;
+    return res.status(200).json({
+      success: true,
+      data: {
+        total,
+        totalIncome,
+        totalExpense,
+        totalSplit
+      }
+    });
+  } catch (error) {
+    next(error)
+  }
+}
+
+
+export const AddExpense = async (req, res, next) => {
+  try {
+    const expense = new ExpenseModel(req.body);
+    await expense.save();
+    return res.status(201).json({
+      success: true,
+      message: 'expense added successfully',
+      data: expense,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSplit = async (req, res, next) => {
+
+  try {
+    const splitData = await SplitModel.find().sort({ createdAt: -1 })
+    return res.status(200).json({ success: true, data: splitData })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const AddSplit = async (req, res, next) => {
+  try {
+    const split = new SplitModel(req.body);
+    await split.save();
+    return res.status(201).json({
+      success: true,
+      message: 'split added successfully',
+      data: split,
     });
   } catch (error) {
     next(error);
@@ -72,7 +156,7 @@ export const verifyOtp = async (req, res, next) => {
     user.isVerified = true;
 
     // ✅ CREATE TOKEN
-    const token = jwt.sign({ id: user._id }, JWT_SECRET_KEY, {
+    const token = jwt.sign({ id: user._id, role: user?.role }, JWT_SECRET_KEY, {
       expiresIn: '7d',
     });
 

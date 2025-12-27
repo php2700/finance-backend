@@ -29,6 +29,7 @@ export const authentication = async (req, res, next) => {
     }
 
     req.userId = user._id;
+    req.role=user.role;
     req.token = token;
     next();
   } catch (error) {
