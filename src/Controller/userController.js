@@ -3,6 +3,8 @@ import { isValidEmail } from '../utils/validateEmail.js';
 import User from '../Models/userModel.js';
 import { generateOtp } from '../utils/generateOtp.js';
 import { sendOtpMail } from '../utils/sendMail.js';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET_KEY } from '../envconfig.js';
 
 export const AddTransction = async (req, res, next) => {
   try {
@@ -68,13 +70,25 @@ export const verifyOtp = async (req, res, next) => {
     user.otp = null;
     user.otpExpire = null;
     user.isVerified = true;
-    await user.save();
 
+    // ✅ CREATE TOKEN
+    const token = jwt.sign({ id: user._id }, JWT_SECRET_KEY, {
+      expiresIn: '7d',
+    });
+
+    // ✅ SAVE TOKEN IN DB
+    user.tokens.push({ token });
+    await user.save();
     return res.status(200).json({
       success: true,
-      message: 'OTP verified',
+      message: 'OTP verified & login successful',
+      token, // 🔥 MUST BE HERE
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+      },
       needsName: !user.name,
-      userId: user._id,
     });
   } catch (error) {
     next(error);
@@ -83,10 +97,22 @@ export const verifyOtp = async (req, res, next) => {
 
 export const addUserName = async (req, res, next) => {
   try {
-    const { userId, name } = req.body;
+    const { name } = req.body;
 
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!name) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Name is required' });
+    }
+
+    // ✅ USER ID FROM TOKEN
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'User not found' });
+    }
 
     user.name = name;
     await user.save();
@@ -94,7 +120,11 @@ export const addUserName = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: 'Profile completed',
-      user,
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+      },
     });
   } catch (error) {
     next(error);
@@ -111,5 +141,27 @@ export const getAllUsers = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+export const logoutUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // ✅ REMOVE CURRENT TOKEN
+    user.tokens = user.tokens.filter((t) => t.token !== req.token);
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (error) {
+    next(error);
   }
 };
