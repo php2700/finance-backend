@@ -1,5 +1,8 @@
-import { PORT } from './src/envconfig.js';
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT:', err.stack);
+});
 
+import { PORT } from './src/envconfig.js';
 import express from 'express';
 import cors from 'cors';
 import adminRouter from './src/Routes/adminRoute.js';
@@ -9,7 +12,6 @@ import expenseCategoryRoute from './src/Routes/expenseCategory.routes.js';
 import ConnectDb from './db/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import e from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
