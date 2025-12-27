@@ -133,7 +133,7 @@ export const addUserName = async (req, res, next) => {
 
 export const getAllUsers = async (req, res, next) => {
   try {
-    console.log('🔥 GET /api/user hit');
+    // console.log('🔥 GET /api/user hit');
     const users = await User.find().select('-otp -otpExpire');
     res.status(200).json({
       success: true,
