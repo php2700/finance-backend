@@ -3,7 +3,7 @@ import ExpenseCategory from '../Models/ExpenseCategory.js';
 /* ================= CREATE ================= */
 export const createExpenseCategory = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name } = req.body || {};
 
     if (!name)
       return res.status(400).json({ message: 'Category name is required' });
@@ -43,7 +43,7 @@ export const getExpenseCategories = async (req, res) => {
 export const updateExpenseCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, status } = req.body;
+    const { name, status } = req.body || {};
 
     const category = await ExpenseCategory.findById(id);
     if (!category)

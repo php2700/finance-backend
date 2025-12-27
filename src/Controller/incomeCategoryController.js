@@ -3,7 +3,8 @@ import IncomeCategory from '../Models/incomeCategoryModel.js';
 /* ================= CREATE CATEGORY ================= */
 export const createIncomeCategory = async (req, res, next) => {
   try {
-    const { name } = req?.body;
+    const { name } = req.body || {};
+
     console.log('REQ HEADERS:', req.headers['content-type']);
     console.log('REQ BODY:', req.body);
     if (!name) {
@@ -24,8 +25,15 @@ export const createIncomeCategory = async (req, res, next) => {
       });
     }
 
+    let image = null;
+    if (req.file) {
+      image = `/uploads/income-category/${req.file.filename}`;
+    }
+    console.log(req.file);
+
     const category = await IncomeCategory.create({
       name: name.trim(),
+      image,
     });
 
     res.status(201).json({
@@ -79,7 +87,7 @@ export const getIncomeCategoryById = async (req, res, next) => {
 export const updateIncomeCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, status } = req.body;
+    const { name, status } = req.body || {};
 
     const category = await IncomeCategory.findById(id);
     if (!category) {
@@ -91,7 +99,9 @@ export const updateIncomeCategory = async (req, res, next) => {
 
     if (name) category.name = name.trim();
     if (typeof status === 'boolean') category.status = status;
-
+    if (req.file) {
+      category.image = `/uploads/income-category/${req.file.filename}`;
+    }
     await category.save();
 
     res.status(200).json({
