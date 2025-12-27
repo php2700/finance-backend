@@ -8,6 +8,10 @@ const expenseCategorySchema = new mongoose.Schema(
       trim: true,
       unique: true,
     },
+    image: {
+      type: String,
+      default: null,
+    },
     status: {
       type: Boolean,
       default: true,
