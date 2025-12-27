@@ -8,46 +8,60 @@ import {
 } from '../envconfig.js';
 
 const checkPassword = async (password, hashPassword) => {
-  const verifyPassword = await bcrypt.compare(password, hashPassword);
-  if (verifyPassword) return verifyPassword;
-  return res.status(401).json({
-    success: false,
-    message: 'Invalid email or password',
-  });
+  return await bcrypt.compare(password, hashPassword);
 };
-const generateToken = async (userData) => {
-  const token = await jwt.sign(
-    { id: userData?.id, role: userData?.role },
-    JWT_SECRET_KEY,
-    { algorithm: JWT_ALGORITHM, expiresIn: JWT_EXPIRE_TIME }
-  );
-  if (token) return token;
-  return res.status(401).json({
-    success: false,
-    message: 'Invalid email or password',
+
+const generateToken = (userData) => {
+  return jwt.sign({ id: userData._id, role: userData.role }, JWT_SECRET_KEY, {
+    algorithm: JWT_ALGORITHM,
+    expiresIn: JWT_EXPIRE_TIME,
   });
 };
 
 export const Login = async (req, res, next) => {
   try {
-    const { email, password } = req?.body;
-    const isExistEmail = await AdminModel.findOne({ email: email });
-    if (!isExistEmail)
-      return res
-        .status(404)
-        .json({ success: false, message: 'email not valid' });
-    await checkPassword(password, isExistEmail?.password);
-    const token = await generateToken(isExistEmail);
-    const userData = {
-      _id: isExistEmail._id,
-      role: isExistEmail.role,
-      email: isExistEmail.email, // ✅ ADD THIS
-      token,
-    };
+    const { email, password } = req.body || {};
 
-    return res
-      .status(200)
-      .json({ message: 'login-successfully', data: userData });
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required',
+      });
+    }
+
+    const isExistEmail = await AdminModel.findOne({ email });
+
+    if (!isExistEmail) {
+      return res.status(404).json({
+        success: false,
+        message: 'Email not valid',
+      });
+    }
+
+    const isPasswordCorrect = await checkPassword(
+      password,
+      isExistEmail.password
+    );
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid password',
+      });
+    }
+
+    const token = generateToken(isExistEmail);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Login successfully',
+      data: {
+        _id: isExistEmail._id,
+        role: isExistEmail.role,
+        email: isExistEmail.email,
+        token,
+      },
+    });
   } catch (error) {
     next(error);
   }

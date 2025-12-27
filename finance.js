@@ -9,6 +9,7 @@ import adminRouter from './src/Routes/adminRoute.js';
 import userRouter from './src/Routes/userRoute.js';
 import incomeCategoryRoute from './src/Routes/incomeCategoryRoute.js';
 import expenseCategoryRoute from './src/Routes/expenseCategory.routes.js';
+import faqRoutes from './src/Routes/faq.routes.js';
 import ConnectDb from './db/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -28,6 +29,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/user', userRouter);
 app.use('/api/income-category', incomeCategoryRoute);
 app.use('/api/expense-category', expenseCategoryRoute);
+app.use('/api/faqs', faqRoutes);
 app.get('/', (req, res) => {
   res.send('API is running.... on post 3012');
 });

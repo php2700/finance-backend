@@ -1,27 +1,28 @@
 import mongoose from 'mongoose';
 
-const expenseCategorySchema = new mongoose.Schema(
+const faqSchema = new mongoose.Schema(
   {
-    name: {
+    question: {
       type: String,
       required: true,
       trim: true,
-      unique: true,
     },
-    image: {
+    answer: {
       type: String,
-      default: null,
+      required: true,
+      trim: true,
     },
     status: {
       type: Boolean,
-      default: true,
+      default: true, // active / inactive
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      default: null,
     },
   },
   { timestamps: true }
 );
 
-export default mongoose.model('ExpenseCategory', expenseCategorySchema);
+export default mongoose.model('Faq', faqSchema);
