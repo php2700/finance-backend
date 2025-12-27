@@ -21,6 +21,19 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // ✅ TOKEN STORAGE
+    tokens: [
+      {
+        token: {
+          type: String,
+          required: true,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
