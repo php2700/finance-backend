@@ -448,6 +448,7 @@ export const verifyOtp = async (req, res, next) => {
         _id: user._id,
         email: user.email,
         name: user.name,
+        role: user.role, // ✅ ADD THIS
       },
       needsName: !user.name,
     });
@@ -502,6 +503,70 @@ export const getAllUsers = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+export const getMyProfile = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId).select(
+      '-otp -otpExpire -tokens'
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+export const updateMyProfile = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const { mobile, address, dob, gender, city, state } = req.body;
+
+    // ✅ OPTIONAL TEXT FIELDS
+    if (mobile) user.mobile = mobile;
+    if (address) user.address = address;
+    if (dob) user.dob = dob;
+    if (gender) user.gender = gender;
+
+    if (city || state) {
+      user.location = {
+        city: city || user.location?.city,
+        state: state || user.location?.state,
+      };
+    }
+
+    // ✅ PROFILE IMAGE
+    if (req.file) {
+      user.profilePic = `/uploads/profile/${req.file.filename}`;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      user,
+    });
+  } catch (error) {
+    next(error);
   }
 };
 

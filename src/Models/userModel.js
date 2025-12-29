@@ -7,31 +7,69 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+
     name: {
       type: String,
       default: null,
     },
-    otp: {
+
+    // ✅ PROFILE FIELDS
+    mobile: {
       type: String,
+      default: null,
     },
-    otpExpire: {
+
+    address: {
+      type: String,
+      default: null,
+    },
+
+    dob: {
       type: Date,
+      default: null,
     },
+
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'other'],
+      default: null,
+    },
+
+    location: {
+      city: {
+        type: String,
+        default: null,
+      },
+      state: {
+        type: String,
+        default: null,
+      },
+    },
+
+    // ✅ PROFILE IMAGE
+    profilePic: {
+      type: String,
+      default: null,
+    },
+
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+    },
+
+    otp: String,
+    otpExpire: Date,
+
     isVerified: {
       type: Boolean,
       default: false,
     },
-    role: {
-      type: String,
-      default: "user"
-    },
+
     // ✅ TOKEN STORAGE
     tokens: [
       {
-        token: {
-          type: String,
-          required: true,
-        },
+        token: String,
         createdAt: {
           type: Date,
           default: Date.now,
