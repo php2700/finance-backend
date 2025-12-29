@@ -11,6 +11,9 @@ const storage = multer.diskStorage({
       folder = 'income-category';
     } else if (req.baseUrl.includes('expense-category')) {
       folder = 'expense-category';
+    } else if (req.baseUrl.includes('/user')) {
+      // ✅ USER PROFILE IMAGE
+      folder = 'profile';
     }
 
     const uploadPath = path.join('public/uploads', folder);
