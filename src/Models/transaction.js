@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const transactionSchema = new mongoose.Schema({
+const incomeSchema = new mongoose.Schema({
 
     userId: {
         type: mongoose.Types.ObjectId,
@@ -13,50 +13,104 @@ const transactionSchema = new mongoose.Schema({
     },
     incomeCategoryId: {
         type: mongoose.Types.ObjectId,
-        ref: 'incomeCategoy',
+        ref: 'IncomeCategory',
         required: false,
     },
     note: {
         type: String,
         required: false
     },
-    transactionType: {
-        type: String,
-        enum: ['income', 'expense', 'split'],
-        default: 'income'
-    },
+
     date: {
-        type:Date,
+        type: Date,
         required: false
     },
-    expenseCategoryId: {
-        type: mongoose.Types.ObjectId,
-        ref: 'expenseCategoy',
-        required: false,
-    },
-    splitData: [
-        {
-            name: {
-                type: String,
-                required: false
-            },
-            splitAmount: {
-                type: Number,
-                required: false
-            },
-            paidStatus:{
-                type:String,
-                required:false,
-                enum:['paid','unpaid'],
-                default:'unpaid'
-            }
-        }
-    ]
+
 
 
 },
     { timestamps: true }
 )
 
-const TransactionModel = mongoose.model('transaction', transactionSchema)
-export default TransactionModel;
+const IncomeModel = mongoose.model('income', incomeSchema)
+export default IncomeModel;
+
+
+
+
+const expenseSchema = new mongoose.Schema({
+
+    userId: {
+        type: mongoose.Types.ObjectId,
+        ref: 'user',
+        required: true,
+    },
+    amount: {
+        type: Number,
+        required: true
+    },
+
+    note: {
+        type: String,
+        required: false
+    },
+    date: {
+        type: Date,
+        required: false
+    },
+    expenseCategoryId: {
+        type: mongoose.Types.ObjectId,
+        ref: 'ExpenseCategory',
+        required: false,
+    },
+
+},
+    { timestamps: true }
+)
+
+export const ExpenseModel = mongoose.model('expense', expenseSchema)
+
+const splitItemSchema = new mongoose.Schema(
+    {
+        name: {
+            type: String,
+            required: false
+        },
+        splitAmount: {
+            type: Number,
+            required: false
+        },
+        paidStatus: {
+            type: String,
+            enum: ["paid", "unpaid"],
+            default: "unpaid"
+        }
+    },
+    {
+        timestamps: true
+    }
+);
+
+const splitSchema = new mongoose.Schema({
+
+    userId: {
+        type: mongoose.Types.ObjectId,
+        ref: 'user',
+        required: true,
+    },
+    amount: {
+        type: Number,
+        required: true
+    },
+    note: {
+        type: String,
+        required: false
+    },
+    splitData: [
+        splitItemSchema
+    ]
+},
+    { timestamps: true }
+)
+
+export const SplitModel = mongoose.model('split', splitSchema)
