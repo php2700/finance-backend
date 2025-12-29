@@ -66,6 +66,7 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
+    // ✅ TOKEN STORAGE
     tokens: [
       {
         token: String,
