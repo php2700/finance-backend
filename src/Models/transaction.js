@@ -25,7 +25,7 @@ const incomeSchema = new mongoose.Schema({
         type: Date,
         required: false
     },
- 
+
 
 
 },
@@ -70,6 +70,26 @@ const expenseSchema = new mongoose.Schema({
 
 export const ExpenseModel = mongoose.model('expense', expenseSchema)
 
+const splitItemSchema = new mongoose.Schema(
+    {
+        name: {
+            type: String,
+            required: false
+        },
+        splitAmount: {
+            type: Number,
+            required: false
+        },
+        paidStatus: {
+            type: String,
+            enum: ["paid", "unpaid"],
+            default: "unpaid"
+        }
+    },
+    {
+        timestamps: true
+    }
+);
 
 const splitSchema = new mongoose.Schema({
 
@@ -87,25 +107,8 @@ const splitSchema = new mongoose.Schema({
         required: false
     },
     splitData: [
-        {
-            name: {
-                type: String,
-                required: false
-            },
-            splitAmount: {
-                type: Number,
-                required: false
-            },
-            paidStatus: {
-                type: String,
-                required: false,
-                enum: ['paid', 'unpaid'],
-                default: 'unpaid'
-            }
-        }
+        splitItemSchema
     ]
-
-
 },
     { timestamps: true }
 )
