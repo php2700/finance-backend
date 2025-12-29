@@ -9,6 +9,10 @@ import {
   addUserName,
   logoutUser,
 } from '../Controller/userController.js';
+import {
+  getMyFeedbacks,
+  createFeedback,
+} from '../Controller/feedbackController.js';
 
 const userRouter = Router();
 
@@ -19,4 +23,10 @@ userRouter.post('/send-otp', sendOtp);
 userRouter.post('/verify-otp', verifyOtp);
 userRouter.post('/add-name', authentication, addUserName);
 userRouter.post('/logout', authentication, logoutUser);
+// ✅ FEEDBACK ROUTES (USER SIDE)
+userRouter.post('/feedback', authentication, createFeedback);
+
+// USER seen own feedback
+userRouter.get('/feedback', authentication, getMyFeedbacks);
+
 export default userRouter;

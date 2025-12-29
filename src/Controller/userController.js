@@ -87,6 +87,7 @@ export const verifyOtp = async (req, res, next) => {
         _id: user._id,
         email: user.email,
         name: user.name,
+        role: user.role, // ✅ ADD THIS
       },
       needsName: !user.name,
     });
