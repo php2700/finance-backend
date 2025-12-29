@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authentication } from '../Middleware/authenticate.js';
 // import { authorization } from "../Middleware/authorize.js";
-import { AddExpense, AddIncome, AddSplit, dashboard, getSplit } from '../Controller/userController.js';
+import { AddExpense, AddIncome, AddSplit, dashboard, getSplit, monthTransaction, transaction, updateSplit } from '../Controller/userController.js';
 import { getAllUsers } from '../Controller/userController.js';
 import upload from '../Middleware/upload.js';
 import {
@@ -20,7 +20,8 @@ import { authorization } from '../Middleware/authorize.js';
 
 const userRouter = Router();
 
-
+userRouter.get('/month-transaction/:userId',authentication,authorization(['user']),monthTransaction)
+userRouter.get('/transaction/:userId',authentication,authorization(['user','admin']), transaction);
 userRouter.get('/dashboard/:userId',authentication,authorization(['user']), dashboard);
 
 /*income*/
@@ -30,7 +31,8 @@ userRouter.post('/add-income',authentication,authorization(['user']), AddIncome)
 userRouter.post('/add-expense',authentication,authorization(['user']), AddExpense);
 
 /*split add*/
-userRouter.get('/split',authentication,authorization(['user']), getSplit);
+userRouter.get('/split/:userId',authentication,authorization(['user']), getSplit);
+userRouter.patch('/split',authentication,authorization(['user']), updateSplit);
 userRouter.post('/split',authentication,authorization(['user']), AddSplit);
 
 
