@@ -1,4 +1,4 @@
-import IncomeModel, { ExpenseModel, SplitModel } from '../Models/transaction.js';
+import IncomeModel, { ExpenseModel, SplitModel, TransactionModel } from '../Models/transaction.js';
 import { isValidEmail } from '../utils/validateEmail.js';
 import User from '../Models/userModel.js';
 import { generateOtp } from '../utils/generateOtp.js';
@@ -6,12 +6,12 @@ import { sendOtpMail } from '../utils/sendMail.js';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET_KEY } from '../envconfig.js';
 import mongoose from 'mongoose';
-
+import { Parser } from "json2csv";
 
 
 export const AddIncome = async (req, res, next) => {
   try {
-    const transaction = new IncomeModel(req.body);
+    const transaction = new TransactionModel(req.body);
     await transaction.save();
     return res.status(201).json({
       success: true,
@@ -96,12 +96,82 @@ export const transaction = async (req, res, next) => {
   }
 };
 
+export const downloadCsv = async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const { userId } = req.params;
+
+    const objectUserId = new mongoose.Types.ObjectId(userId);
+
+    const createdAtFilter = {};
+
+    if (startDate && endDate) {
+      createdAtFilter.$gte = new Date(`${startDate}T00:00:00.000Z`);
+      createdAtFilter.$lte = new Date(`${endDate}T23:59:59.999Z`);
+    }
+
+    const [income, expense] = await Promise.all([
+      IncomeModel.find({
+        userId: objectUserId,
+        ...(startDate && endDate && { createdAt: createdAtFilter })
+      })
+        .populate("incomeCategoryId", "name")
+        .lean(),
+
+      ExpenseModel.find({
+        userId: objectUserId,
+        ...(startDate && endDate && { createdAt: createdAtFilter })
+      })
+        .populate("expenseCategoryId", "name")
+        .lean()
+    ]);
+
+    const incomeWithType = income.map(item => ({
+      date: item.createdAt,
+      amount: item.amount,
+      category: item.incomeCategoryId?.name || "",
+      note: item.note || "",
+      transactionType: "income"
+    }));
+
+    const expenseWithType = expense.map(item => ({
+      date: item.createdAt,
+      amount: item.amount,
+      category: item.expenseCategoryId?.name || "",
+      note: item.note || "",
+      transactionType: "expense"
+    }));
+
+    const allTransactions = [...incomeWithType, ...expenseWithType].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    const fields = [
+      { label: "Date", value: "date" },
+      { label: "Type", value: "transactionType" },
+      { label: "Amount", value: "amount" },
+      { label: "Category", value: "category" },
+      { label: "Note", value: "note" }
+    ];
+
+    const parser = new Parser({ fields });
+    const csv = parser.parse(allTransactions);
+
+    res.header("Content-Type", "text/csv");
+    res.attachment(`transactions_${Date.now()}.csv`);
+    return res.send(csv);
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 export const monthTransaction = async (req, res, next) => {
   try {
     const { userId } = req.params;
     const objectUserId = new mongoose.Types.ObjectId(userId);
 
-    // 🔹 Current month boundaries
     const now = new Date();
 
     const startOfMonth = new Date(
@@ -173,105 +243,121 @@ export const dashboard = async (req, res, next) => {
     const { userId } = req.params;
     const objectUserId = new mongoose.Types.ObjectId(userId);
 
-    const [incomeAgg, expenseAgg, splitAgg] = await Promise.all([
-      IncomeModel.aggregate([
-        { $match: { userId: objectUserId } },
+    const [incomeAgg, expenseAgg, splitSum, splitAgg] = await Promise.all([
+      // Total income
+      TransactionModel.aggregate([
+        { $match: { userId: objectUserId, type: "income" } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
-      ExpenseModel.aggregate([
-        { $match: { userId: objectUserId } },
+
+      // Total expense
+      TransactionModel.aggregate([
+        { $match: { userId: objectUserId, type: "expense" } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
-      SplitModel.aggregate([
-        { $match: { userId: objectUserId } },
+
+      // Total paid split amounts (from others)
+      TransactionModel.aggregate([
+        { $match: { userId: objectUserId, type: "split" } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
-      ])
+      ]),
+    SplitModel.aggregate([
+  {
+    $match: {
+      userId: objectUserId
+    }
+  },
+  {
+    $project: {
+      splitAmount: {
+        $sum: {
+          $map: {
+            input: {
+              $filter: {
+                input: "$splitData",
+                as: "s",
+                cond: { $ne: ["$$s.name", "you"] } // only include names not "you"
+              }
+            },
+            as: "s",
+            in: "$$s.splitAmount"
+          }
+        }
+      }
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      totalSplitAmount: { $sum: "$splitAmount" } // sum across all documents
+    }
+  }
+])
+
     ]);
 
     const totalIncome = incomeAgg[0]?.total || 0;
     const totalExpense = expenseAgg[0]?.total || 0;
-    const totalSplit = splitAgg[0]?.total || 0;
+    const totalSplit = splitSum[0]?.total || 0
+    const totalPaidSplitAmount = splitAgg[0]?.totalSplitAmount || 0;
 
-    const total = totalIncome - totalExpense - totalSplit;
-
-    const percentage =
-      totalIncome > 0
-        ? Number(((total / totalIncome) * 100).toFixed(2))
-        : 0;
-
-    const percentStatus = percentage >= 0 ? "positive" : "negative";
-
+    const income=totalIncome + totalPaidSplitAmount
+    const overallTotal =income  - totalExpense - totalSplit;
+    const overallPercentage = totalIncome > 0 ? Number(((overallTotal / income) * 100).toFixed(2)) : 0;
+    const overallStatus = overallPercentage >= 0 ? "positive" : "negative";
 
     const now = new Date();
-
-    const startOfMonth = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1
-    );
-
-    const startOfNextMonth = new Date(
-      now.getFullYear(),
-      now.getMonth() + 1,
-      1
-    );
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const currentMonthMatch = {
-      userId: objectUserId,
-      createdAt: {
-        $gte: startOfMonth,
-        $lt: startOfNextMonth
-      }
+      createdAt: { $gte: startOfMonth, $lt: startOfNextMonth }
     };
 
     const [incomeMonth, expenseMonth, splitMonth] = await Promise.all([
-      IncomeModel.aggregate([
-        { $match: currentMonthMatch },
+      TransactionModel.aggregate([
+        { $match: { ...currentMonthMatch, userId: objectUserId, type: "income" } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
-      ExpenseModel.aggregate([
-        { $match: currentMonthMatch },
+      TransactionModel.aggregate([
+        { $match: { ...currentMonthMatch, userId: objectUserId, type: "expense" } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
       SplitModel.aggregate([
-        { $match: currentMonthMatch },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
+        { $match: { ...currentMonthMatch, userId: objectUserId, paidStatus: "paid", name: { $ne: "you" } } },
+        { $group: { _id: null, totalPaidSplitAmount: { $sum: "$splitAmount" } } }
       ])
     ]);
 
     const currentMonthIncome = incomeMonth[0]?.total || 0;
     const currentMonthExpense = expenseMonth[0]?.total || 0;
-    const currentMonthSplit = splitMonth[0]?.total || 0;
+    const currentMonthPaidSplitAmount = splitMonth[0]?.totalPaidSplitAmount || 0;
 
-    const currentMonthTotal =
-      currentMonthIncome - currentMonthExpense - currentMonthSplit;
+    const currentMonthTotal = currentMonthIncome + currentMonthPaidSplitAmount - currentMonthExpense;
+    const currentMonthPercentage = currentMonthIncome > 0
+      ? Number(((currentMonthTotal / currentMonthIncome) * 100).toFixed(2))
+      : 0;
+    const currentMonthStatus = currentMonthPercentage >= 0 ? "positive" : "negative";
 
-    const currentMonthPercentage =
-      currentMonthIncome > 0
-        ? Number(
-          ((currentMonthTotal / currentMonthIncome) * 100).toFixed(2)
-        )
-        : 0;
-
-    const currentMonthStatus =
-      currentMonthPercentage >= 0 ? "positive" : "negative";
-
+    // --------------------------
+    // 3️⃣ Return response
+    // --------------------------
     return res.status(200).json({
       success: true,
       data: {
         userId,
         overall: {
-          total,
-          percentage,
-          percentStatus,
+          total: overallTotal,
+          percentage: overallPercentage,
+          percentStatus: overallStatus,
           totalIncome,
           totalExpense,
-          totalSplit
+          totalPaidSplitAmount
         },
         currentMonth: {
           income: currentMonthIncome,
           expense: currentMonthExpense,
-          split: currentMonthSplit,
+          totalPaidSplitAmount: currentMonthPaidSplitAmount,
           total: currentMonthTotal,
           percentage: currentMonthPercentage,
           percentStatus: currentMonthStatus
@@ -286,9 +372,11 @@ export const dashboard = async (req, res, next) => {
 
 
 
+
+
 export const AddExpense = async (req, res, next) => {
   try {
-    const expense = new ExpenseModel(req.body);
+    const expense = new TransactionModel(req.body);
     await expense.save();
     return res.status(201).json({
       success: true,
@@ -303,18 +391,34 @@ export const AddExpense = async (req, res, next) => {
 export const getSplit = async (req, res, next) => {
   try {
     const { userId } = req.params;
+    const objectUserId = new mongoose.Types.ObjectId(userId);
 
-    const splitData = await SplitModel.find({
-      userId: new mongoose.Types.ObjectId(userId)
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    const splitData = await TransactionModel.aggregate([
+      {
+        $match: {
+          userId: objectUserId,
+          type: "split"
+        }
+      },
 
-    const unpaidCount = splitData.reduce((total, item) => {
-      const unpaidInItem = item.splitData?.filter(
-        split => split.paidStatus === "unpaid"
-      ).length || 0;
-      return total + unpaidInItem;
+      {
+        $lookup: {
+          from: "splits",
+          localField: "_id",
+          foreignField: "trnasactionId",
+          as: "splits"
+        }
+      },
+
+      { $sort: { createdAt: -1 } }
+    ]);
+
+
+    const unpaidCount = splitData.reduce((count, txn) => {
+      const unpaid = txn.splits.filter(
+        s => s.paidStatus === "unpaid"
+      ).length;
+      return count + unpaid;
     }, 0);
 
     return res.status(200).json({
@@ -329,24 +433,12 @@ export const getSplit = async (req, res, next) => {
 };
 
 
+
 export const updateSplit = async (req, res, next) => {
   try {
-    const { userId, paidStatus, splitId, amount } = req.body;
+    const { paidStatus, splitId, amount, trnasactionId } = req.body;
 
-    const result = await SplitModel.findOneAndUpdate(
-      {
-        userId: new mongoose.Types.ObjectId(userId),
-        "splitData._id": new mongoose.Types.ObjectId(splitId)
-      },
-      {
-        $set: {
-          "splitData.$.paidStatus": paidStatus
-        }
-      },
-      {
-        new: true
-      }
-    );
+    const result = await SplitModel.findById(splitId);
 
     if (!result) {
       return res.status(404).json({
@@ -355,6 +447,10 @@ export const updateSplit = async (req, res, next) => {
       });
     }
 
+    result.paidStatus = paidStatus;
+    result.amount = amount;
+
+    await result.save();
     return res.status(200).json({
       success: true,
       message: "Paid status updated successfully",
@@ -369,17 +465,40 @@ export const updateSplit = async (req, res, next) => {
 
 export const AddSplit = async (req, res, next) => {
   try {
-    const split = new SplitModel(req.body);
-    await split.save();
+    const { userId, amount, note, type, splitData } = req.body;
+
+    // 1️⃣ Create transaction
+    const transaction = await TransactionModel.create({
+      userId,
+      amount,
+      note,
+      type: type
+    });
+
+    // 2️⃣ Prepare split documents
+    const splitDocs = splitData.map(item => ({
+      trnasactionId: transaction._id, // typo kept as per schema
+      name: item.name,
+      userId: userId,
+      splitAmount: item.splitAmount,
+      paidStatus: item.paidStatus
+    }));
+
+    // 3️⃣ Insert all split users
+    await SplitModel.insertMany(splitDocs);
+
     return res.status(201).json({
       success: true,
-      message: 'split added successfully',
-      data: split,
+      message: "Split transaction added successfully",
+      transactionId: transaction._id, userId
     });
+
   } catch (error) {
     next(error);
   }
 };
+
+
 
 export const sendOtp = async (req, res, next) => {
   try {
