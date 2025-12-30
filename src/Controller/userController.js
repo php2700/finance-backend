@@ -23,7 +23,6 @@ export const AddIncome = async (req, res, next) => {
   }
 };
 
-
 export const transaction = async (req, res, next) => {
   try {
     const { transactionType } = req.query;
@@ -37,8 +36,8 @@ export const transaction = async (req, res, next) => {
         type: "income"
       })
         .populate({
-          path: "incomeCategoryId",
-          select: "name image"
+          path: 'incomeCategoryId',
+          select: 'name image',
         })
         .sort({ createdAt: -1 })
         .lean();
@@ -55,8 +54,8 @@ export const transaction = async (req, res, next) => {
         type: "expense"
       })
         .populate({
-          path: "expenseCategoryId",
-          select: "name image"
+          path: 'expenseCategoryId',
+          select: 'name image',
         })
         .sort({ createdAt: -1 })
         .lean();
@@ -86,9 +85,8 @@ export const transaction = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      data: allTransactions
+      data: allTransactions,
     });
-
   } catch (error) {
     next(error);
   }
@@ -162,17 +160,16 @@ export const monthTransaction = async (req, res, next) => {
 
     const now = new Date();
 
-    const startOfMonth = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1
-    );
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const endOfMonth = new Date(
       now.getFullYear(),
       now.getMonth() + 1,
       0,
-      23, 59, 59, 999
+      23,
+      59,
+      59,
+      999
     );
 
     // 🔹 Fetch all transactions for current month
@@ -204,7 +201,6 @@ export const monthTransaction = async (req, res, next) => {
       totalTransactions: formattedTransactions.length,
       data: formattedTransactions
     });
-
   } catch (error) {
     next(error);
   }
@@ -311,11 +307,10 @@ export const dashboard = async (req, res, next) => {
           totalPaidSplitAmount: currentMonthPaidSplitAmount,
           total: currentMonthTotal,
           percentage: currentMonthPercentage,
-          percentStatus: currentMonthStatus
-        }
-      }
+          percentStatus: currentMonthStatus,
+        },
+      },
     });
-
   } catch (error) {
     next(error);
   }
@@ -375,9 +370,8 @@ export const getSplit = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       unpaidCount,
-      data: splitData
+      data: splitData,
     });
-
   } catch (error) {
     next(error);
   }
@@ -394,7 +388,7 @@ export const updateSplit = async (req, res, next) => {
     if (!result) {
       return res.status(404).json({
         success: false,
-        message: "Split data not found"
+        message: 'Split data not found',
       });
     }
 
@@ -404,15 +398,13 @@ export const updateSplit = async (req, res, next) => {
     await result.save();
     return res.status(200).json({
       success: true,
-      message: "Paid status updated successfully",
-      data: result
+      message: 'Paid status updated successfully',
+      data: result,
     });
-
   } catch (error) {
     next(error);
   }
 };
-
 
 export const AddSplit = async (req, res, next) => {
   try {
@@ -565,11 +557,24 @@ export const addUserName = async (req, res, next) => {
 
 export const getAllUsers = async (req, res, next) => {
   try {
-    // console.log('🔥 GET /api/user hit');
-    const users = await User.find().select('-otp -otpExpire');
+    const users = await User.find()
+      .select(
+        'name email role profilePic gender dob mobile address location createdAt'
+      )
+      .lean();
+
+    // 🔥 Ensure location always exists (frontend safe)
+    const formattedUsers = users.map((u) => ({
+      ...u,
+      location: {
+        city: u.location?.city || '',
+        state: u.location?.state || '',
+      },
+    }));
+
     res.status(200).json({
       success: true,
-      users,
+      users: formattedUsers,
     });
   } catch (err) {
     next(err);

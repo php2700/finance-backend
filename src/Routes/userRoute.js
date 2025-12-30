@@ -26,16 +26,40 @@ userRouter.get('/transaction/:userId',authentication,authorization(['user','admi
 userRouter.get('/dashboard/:userId',authentication,authorization(['user']), dashboard);
 
 /*income*/
-userRouter.post('/add-income',authentication,authorization(['user']), AddIncome);
+userRouter.post(
+  '/add-income',
+  authentication,
+  authorization(['user']),
+  AddIncome
+);
 
 /*expense*/
-userRouter.post('/add-expense',authentication,authorization(['user']), AddExpense);
+userRouter.post(
+  '/add-expense',
+  authentication,
+  authorization(['user']),
+  AddExpense
+);
 
 /*split add*/
-userRouter.get('/split/:userId',authentication,authorization(['user']), getSplit);
-userRouter.patch('/split',authentication,authorization(['user']), updateSplit);
-userRouter.post('/split',authentication,authorization(['user']), AddSplit);
-
+userRouter.get(
+  '/split/:userId',
+  authentication,
+  authorization(['user', 'admin']),
+  getSplit
+);
+userRouter.patch(
+  '/split',
+  authentication,
+  authorization(['user', 'admin']),
+  updateSplit
+);
+userRouter.post(
+  '/split',
+  authentication,
+  authorization(['user', 'admin']),
+  AddSplit
+);
 
 userRouter.get('/', getAllUsers);
 userRouter.post('/send-otp', sendOtp);
