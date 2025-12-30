@@ -1,16 +1,7 @@
 import { Router } from 'express';
 import { authentication } from '../Middleware/authenticate.js';
 // import { authorization } from "../Middleware/authorize.js";
-import {
-  AddExpense,
-  AddIncome,
-  AddSplit,
-  dashboard,
-  getSplit,
-  monthTransaction,
-  transaction,
-  updateSplit,
-} from '../Controller/userController.js';
+import { AddExpense, AddIncome, AddSplit, dashboard, downloadCsv, getSplit, monthTransaction, transaction, updateSplit } from '../Controller/userController.js';
 import { getAllUsers } from '../Controller/userController.js';
 import upload from '../Middleware/upload.js';
 import {
@@ -29,24 +20,10 @@ import { authorization } from '../Middleware/authorize.js';
 
 const userRouter = Router();
 
-userRouter.get(
-  '/month-transaction/:userId',
-  authentication,
-  authorization(['user']),
-  monthTransaction
-);
-userRouter.get(
-  '/transaction/:userId',
-  authentication,
-  authorization(['user', 'admin']),
-  transaction
-);
-userRouter.get(
-  '/dashboard/:userId',
-  authentication,
-  authorization(['user']),
-  dashboard
-);
+userRouter.get('/download-csv/:userId',authentication,authorization(['user']),downloadCsv)
+userRouter.get('/month-transaction/:userId',authentication,authorization(['user']),monthTransaction)
+userRouter.get('/transaction/:userId',authentication,authorization(['user','admin']), transaction);
+userRouter.get('/dashboard/:userId',authentication,authorization(['user']), dashboard);
 
 /*income*/
 userRouter.post(
