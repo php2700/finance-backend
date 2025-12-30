@@ -32,59 +32,57 @@ export const transaction = async (req, res, next) => {
     const objectUserId = new mongoose.Types.ObjectId(userId);
 
     if (transactionType === "income") {
-      const incomeTransaction = await IncomeModel.find({
-        userId: objectUserId
+      const incomeTransactions = await TransactionModel.find({
+        userId: objectUserId,
+        type: "income"
       })
-        .populate("incomeCategoryId")
-        .sort({ createdAt: -1 });
-
-      return res.status(200).json({
-        success: true,
-        data: incomeTransaction
-      });
-    }
-
-    if (transactionType === "expense") {
-      const expenseTransaction = await ExpenseModel.find({
-        userId: objectUserId
-      }).populate("expenseCategoryId").sort({ createdAt: -1 });
-
-      return res.status(200).json({
-        success: true,
-        data: expenseTransaction
-      });
-    }
-
-
-    const [income, expense] = await Promise.all([
-      IncomeModel.find({ userId: objectUserId })
         .populate({
           path: "incomeCategoryId",
           select: "name image"
         })
-        .lean(),
+        .sort({ createdAt: -1 })
+        .lean();
 
-      ExpenseModel.find({ userId: objectUserId })
+      return res.status(200).json({
+        success: true,
+        data: incomeTransactions
+      });
+    }
+
+    if (transactionType === "expense") {
+      const expenseTransactions = await TransactionModel.find({
+        userId: objectUserId,
+        type: "expense"
+      })
         .populate({
           path: "expenseCategoryId",
           select: "name image"
         })
-        .lean()
-    ]);
+        .sort({ createdAt: -1 })
+        .lean();
 
-    const incomeWithType = income.map(item => ({
-      ...item,
-      transactionType: "income"
-    }));
+      return res.status(200).json({
+        success: true,
+        data: expenseTransactions
+      });
+    }
 
-    const expenseWithType = expense.map(item => ({
-      ...item,
-      transactionType: "expense"
-    }));
-
-    const allTransactions = [...incomeWithType, ...expenseWithType]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
+    const allTransactions = await TransactionModel.find({
+      userId: objectUserId
+    })
+      .populate({
+        path: "incomeCategoryId",
+        select: "name image"
+      })
+      .populate({
+        path: "expenseCategoryId",
+        select: "name image"
+      })
+      .populate({
+          path: "trnasactionId",
+      })
+      .sort({ createdAt: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
@@ -95,6 +93,7 @@ export const transaction = async (req, res, next) => {
     next(error);
   }
 };
+
 
 export const downloadCsv = async (req, res, next) => {
   try {
@@ -110,41 +109,29 @@ export const downloadCsv = async (req, res, next) => {
       createdAtFilter.$lte = new Date(`${endDate}T23:59:59.999Z`);
     }
 
-    const [income, expense] = await Promise.all([
-      IncomeModel.find({
-        userId: objectUserId,
-        ...(startDate && endDate && { createdAt: createdAtFilter })
-      })
-        .populate("incomeCategoryId", "name")
-        .lean(),
+    // 🔹 Fetch transactions from single collection
+    const transactions = await TransactionModel.find({
+      userId: objectUserId,
+      ...(startDate && endDate && { createdAt: createdAtFilter })
+    })
+      .populate("incomeCategoryId", "name")
+      .populate("expenseCategoryId", "name")
+      .sort({ createdAt: -1 })
+      .lean();
 
-      ExpenseModel.find({
-        userId: objectUserId,
-        ...(startDate && endDate && { createdAt: createdAtFilter })
-      })
-        .populate("expenseCategoryId", "name")
-        .lean()
-    ]);
-
-    const incomeWithType = income.map(item => ({
+    // 🔹 Format data for CSV
+    const formattedTransactions = transactions.map(item => ({
       date: item.createdAt,
       amount: item.amount,
-      category: item.incomeCategoryId?.name || "",
+      category:
+        item.type === "income"
+          ? item.incomeCategoryId?.name || ""
+          : item.type === "expense"
+            ? item.expenseCategoryId?.name || ""
+            : "",
       note: item.note || "",
-      transactionType: "income"
+      transactionType: item.type
     }));
-
-    const expenseWithType = expense.map(item => ({
-      date: item.createdAt,
-      amount: item.amount,
-      category: item.expenseCategoryId?.name || "",
-      note: item.note || "",
-      transactionType: "expense"
-    }));
-
-    const allTransactions = [...incomeWithType, ...expenseWithType].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
 
     const fields = [
       { label: "Date", value: "date" },
@@ -155,7 +142,7 @@ export const downloadCsv = async (req, res, next) => {
     ];
 
     const parser = new Parser({ fields });
-    const csv = parser.parse(allTransactions);
+    const csv = parser.parse(formattedTransactions);
 
     res.header("Content-Type", "text/csv");
     res.attachment(`transactions_${Date.now()}.csv`);
@@ -165,6 +152,7 @@ export const downloadCsv = async (req, res, next) => {
     next(error);
   }
 };
+
 
 
 export const monthTransaction = async (req, res, next) => {
@@ -187,56 +175,41 @@ export const monthTransaction = async (req, res, next) => {
       23, 59, 59, 999
     );
 
-    // 🔹 Fetch both sorted by insertion time
-    const [income, expense] = await Promise.all([
-      IncomeModel.find({
-        userId: objectUserId,
-        date: { $gte: startOfMonth, $lte: endOfMonth }
+    // 🔹 Fetch all transactions for current month
+    const transactions = await TransactionModel.find({
+      userId: objectUserId,
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth }
+    })
+      .populate({
+        path: "incomeCategoryId",
+        select: "name image"
       })
-        .populate("incomeCategoryId", "name image")
-        .sort({ createdAt: 1 }) // ⬅ oldest → newest
-        .lean(),
-
-      ExpenseModel.find({
-        userId: objectUserId,
-        date: { $gte: startOfMonth, $lte: endOfMonth }
+      .populate({
+        path: "expenseCategoryId",
+        select: "name image"
       })
-        .populate("expenseCategoryId", "name image")
-        .sort({ createdAt: 1 }) // ⬅ oldest → newest
-        .lean()
-    ]);
+      .sort({ createdAt: 1 }) // ⬅ oldest → newest
+      .lean();
 
-    // 🔹 Add transaction type
-    const incomeWithType = income.map(item => ({
+    // 🔹 Add transactionType explicitly (already exists but for frontend safety)
+    const formattedTransactions = transactions.map(item => ({
       ...item,
-      transactionType: "income"
+      transactionType: item.type // income | expense | split
     }));
-
-    const expenseWithType = expense.map(item => ({
-      ...item,
-      transactionType: "expense"
-    }));
-
-    // 🔹 Merge WITHOUT sorting again
-    const allTransactions = [...incomeWithType, ...expenseWithType]
-      .sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() -
-          new Date(b.createdAt).getTime()
-      );
 
     return res.status(200).json({
       success: true,
       month: now.getMonth() + 1,
       year: now.getFullYear(),
-      totalTransactions: allTransactions.length,
-      data: allTransactions
+      totalTransactions: formattedTransactions.length,
+      data: formattedTransactions
     });
 
   } catch (error) {
     next(error);
   }
 };
+
 
 export const dashboard = async (req, res, next) => {
   try {
@@ -256,54 +229,27 @@ export const dashboard = async (req, res, next) => {
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
 
-      // Total paid split amounts (from others)
       TransactionModel.aggregate([
         { $match: { userId: objectUserId, type: "split" } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
-    SplitModel.aggregate([
-  {
-    $match: {
-      userId: objectUserId
-    }
-  },
-  {
-    $project: {
-      splitAmount: {
-        $sum: {
-          $map: {
-            input: {
-              $filter: {
-                input: "$splitData",
-                as: "s",
-                cond: { $ne: ["$$s.name", "you"] } // only include names not "you"
-              }
-            },
-            as: "s",
-            in: "$$s.splitAmount"
-          }
-        }
-      }
-    }
-  },
-  {
-    $group: {
-      _id: null,
-      totalSplitAmount: { $sum: "$splitAmount" } // sum across all documents
-    }
-  }
-])
+      SplitModel.aggregate([
+        { $match: { userId: objectUserId, paidStatus: "paid", name: { $ne: "you" } } },
+        { $group: { _id: null, totalPaidSplitAmount: { $sum: "$splitAmount" } } }
+      ])
 
     ]);
 
     const totalIncome = incomeAgg[0]?.total || 0;
     const totalExpense = expenseAgg[0]?.total || 0;
     const totalSplit = splitSum[0]?.total || 0
-    const totalPaidSplitAmount = splitAgg[0]?.totalSplitAmount || 0;
+    const totalPaidSplitAmount = splitAgg[0]?.totalPaidSplitAmount || 0;
 
-    const income=totalIncome + totalPaidSplitAmount
-    const overallTotal =income  - totalExpense - totalSplit;
-    const overallPercentage = totalIncome > 0 ? Number(((overallTotal / income) * 100).toFixed(2)) : 0;
+
+    const income = totalIncome + totalPaidSplitAmount
+    const expnese = totalExpense + totalSplit;
+    const overallTotal = income - expnese;
+    const overallPercentage = income > 0 ? Number(((overallTotal / income) * 100).toFixed(2)) : 0;
     const overallStatus = overallPercentage >= 0 ? "positive" : "negative";
 
     const now = new Date();
@@ -314,13 +260,17 @@ export const dashboard = async (req, res, next) => {
       createdAt: { $gte: startOfMonth, $lt: startOfNextMonth }
     };
 
-    const [incomeMonth, expenseMonth, splitMonth] = await Promise.all([
+    const [incomeMonth, expenseMonth, splitAmount, splitMonth] = await Promise.all([
       TransactionModel.aggregate([
         { $match: { ...currentMonthMatch, userId: objectUserId, type: "income" } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
       TransactionModel.aggregate([
         { $match: { ...currentMonthMatch, userId: objectUserId, type: "expense" } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+      ]),
+      TransactionModel.aggregate([
+        { $match: { ...currentMonthMatch, userId: objectUserId, type: "split" } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
       SplitModel.aggregate([
@@ -332,16 +282,17 @@ export const dashboard = async (req, res, next) => {
     const currentMonthIncome = incomeMonth[0]?.total || 0;
     const currentMonthExpense = expenseMonth[0]?.total || 0;
     const currentMonthPaidSplitAmount = splitMonth[0]?.totalPaidSplitAmount || 0;
+    const splitMonthAmount = splitAmount[0]?.total || 0;
 
-    const currentMonthTotal = currentMonthIncome + currentMonthPaidSplitAmount - currentMonthExpense;
-    const currentMonthPercentage = currentMonthIncome > 0
-      ? Number(((currentMonthTotal / currentMonthIncome) * 100).toFixed(2))
+    const monthIncome = currentMonthIncome + currentMonthPaidSplitAmount;
+    const monthExpense = currentMonthExpense + splitMonthAmount
+
+    const currentMonthTotal = monthIncome - monthExpense;
+    const currentMonthPercentage = monthIncome > 0
+      ? Number(((currentMonthTotal / monthIncome) * 100).toFixed(2))
       : 0;
     const currentMonthStatus = currentMonthPercentage >= 0 ? "positive" : "negative";
 
-    // --------------------------
-    // 3️⃣ Return response
-    // --------------------------
     return res.status(200).json({
       success: true,
       data: {
@@ -350,13 +301,13 @@ export const dashboard = async (req, res, next) => {
           total: overallTotal,
           percentage: overallPercentage,
           percentStatus: overallStatus,
-          totalIncome,
-          totalExpense,
+          income,
+          expnese,
           totalPaidSplitAmount
         },
         currentMonth: {
-          income: currentMonthIncome,
-          expense: currentMonthExpense,
+          income: monthIncome,
+          expense: monthExpense,
           totalPaidSplitAmount: currentMonthPaidSplitAmount,
           total: currentMonthTotal,
           percentage: currentMonthPercentage,
