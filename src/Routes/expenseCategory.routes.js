@@ -7,19 +7,24 @@ import {
   updateExpenseCategory,
   deleteExpenseCategory,
 } from '../Controller/expenseCategory.controller.js';
+import { authentication } from '../Middleware/authenticate.js';
+import { authorization } from '../Middleware/authorize.js';
 
 /* ================= ROUTES ================= */
 
 // Create
-router.post('/', upload.single('image'), createExpenseCategory);
+router.post('/',authentication,
+  authorization(['admin']),  upload.single('image'), createExpenseCategory);
 
 // Read
 router.get('/', getExpenseCategories);
 
 // Update
-router.put('/:id', upload.single('image'), updateExpenseCategory);
+router.put('/:id',authentication,
+  authorization(['admin']),  upload.single('image'), updateExpenseCategory);
 
 // Delete
-router.delete('/:id', deleteExpenseCategory);
+router.delete('/:id',authentication,
+  authorization(['admin']),  deleteExpenseCategory);
 
 export default router;

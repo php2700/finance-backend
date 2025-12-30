@@ -62,7 +62,8 @@ userRouter.post(
   AddSplit
 );
 
-userRouter.get('/', getAllUsers);
+userRouter.get('/',authentication,
+  authorization(['admin']),  getAllUsers);
 userRouter.post('/send-otp', sendOtp);
 userRouter.post('/verify-otp', verifyOtp);
 userRouter.post('/add-name', authentication, addUserName);

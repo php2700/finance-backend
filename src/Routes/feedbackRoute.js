@@ -21,8 +21,8 @@ router.get('/my', authentication, getMyFeedbacks);
  */
 router.get(
   '/',
-  authentication,
-  authorizeRoles('admin', 'super_admin'),
+authentication,
+  authorization(['admin']), 
   getAllFeedbacks
 );
 
