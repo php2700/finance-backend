@@ -66,8 +66,37 @@ export const transaction = async (req, res, next) => {
       });
     }
 
-    const allTransactions = await TransactionModel.find({
-      userId: objectUserId
+    const splits = await SplitModel.aggregate([
+      {
+        $match: {
+          userId: objectUserId,
+          paidStatus: "paid",
+          name: { $ne: "you" }
+        }
+      },
+      {
+        $lookup: {
+          from: "transactions",
+          localField: "trnasactionId",
+          foreignField: "_id",
+          as: "transaction"
+        }
+      },
+      { $unwind: "$transaction" },
+      {
+        $addFields: {
+          type: "split",
+          amount: "$splitAmount",
+          note: "$transaction.note",
+          sortDate: "$updatedAt"
+        }
+      }
+    ]);
+
+
+    const transactions = await TransactionModel.find({
+      userId: objectUserId,
+      type: { $in: ["income", "expense"] }
     })
       .populate({
         path: "incomeCategoryId",
@@ -77,16 +106,18 @@ export const transaction = async (req, res, next) => {
         path: "expenseCategoryId",
         select: "name image"
       })
-      .populate({
-          path: "trnasactionId",
-      })
       .sort({ createdAt: -1 })
       .lean();
+
+    const allTransactions = [...transactions, ...splits].sort(
+      (a, b) => new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime()
+    );
 
     return res.status(200).json({
       success: true,
       data: allTransactions,
     });
+
   } catch (error) {
     next(error);
   }
@@ -100,47 +131,69 @@ export const downloadCsv = async (req, res, next) => {
 
     const objectUserId = new mongoose.Types.ObjectId(userId);
 
-    const createdAtFilter = {};
-
+    const dateFilter = {};
     if (startDate && endDate) {
-      createdAtFilter.$gte = new Date(`${startDate}T00:00:00.000Z`);
-      createdAtFilter.$lte = new Date(`${endDate}T23:59:59.999Z`);
+      dateFilter.$gte = new Date(`${startDate}T00:00:00.000Z`);
+      dateFilter.$lte = new Date(`${endDate}T23:59:59.999Z`);
     }
 
-    // 🔹 Fetch transactions from single collection
+    /* 🔹 1. Income + Expense Transactions */
     const transactions = await TransactionModel.find({
       userId: objectUserId,
-      ...(startDate && endDate && { createdAt: createdAtFilter })
+      type: { $in: ["income", "expense"] },
+      ...(startDate && endDate && { createdAt: dateFilter })
     })
       .populate("incomeCategoryId", "name")
       .populate("expenseCategoryId", "name")
-      .sort({ createdAt: -1 })
       .lean();
 
-    // 🔹 Format data for CSV
     const formattedTransactions = transactions.map(item => ({
       date: item.createdAt,
+      transactionType: item.type,
       amount: item.amount,
       category:
         item.type === "income"
           ? item.incomeCategoryId?.name || ""
-          : item.type === "expense"
-            ? item.expenseCategoryId?.name || ""
-            : "",
-      note: item.note || "",
-      transactionType: item.type
+          : item.expenseCategoryId?.name || "",
+      note: item.note || ""
     }));
+
+    /* 🔹 2. Paid Split Transactions (name !== "you") */
+    const splits = await SplitModel.find({
+      userId: objectUserId,
+      paidStatus: "paid",
+      name: { $ne: "you" },
+      ...(startDate && endDate && { updatedAt: dateFilter })
+    })
+      .populate({
+        path: "trnasactionId",
+        select: "note"
+      })
+      .lean();
+
+    const formattedSplits = splits.map(item => ({
+      date: item.updatedAt,
+      transactionType: "split",
+      amount: item.splitAmount,
+      category: item.name, // person name
+      note: item.trnasactionId?.note || ""
+    }));
+
+    const allData = [...formattedTransactions, ...formattedSplits].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
 
     const fields = [
       { label: "Date", value: "date" },
       { label: "Type", value: "transactionType" },
       { label: "Amount", value: "amount" },
-      { label: "Category", value: "category" },
+      { label: "Category / Name", value: "category" },
       { label: "Note", value: "note" }
     ];
 
     const parser = new Parser({ fields });
-    const csv = parser.parse(formattedTransactions);
+    const csv = parser.parse(allData);
 
     res.header("Content-Type", "text/csv");
     res.attachment(`transactions_${Date.now()}.csv`);
@@ -161,7 +214,6 @@ export const monthTransaction = async (req, res, next) => {
     const now = new Date();
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
     const endOfMonth = new Date(
       now.getFullYear(),
       now.getMonth() + 1,
@@ -172,39 +224,62 @@ export const monthTransaction = async (req, res, next) => {
       999
     );
 
-    // 🔹 Fetch all transactions for current month
+    // 🔹 1️⃣ Income + Expense (TransactionModel)
     const transactions = await TransactionModel.find({
       userId: objectUserId,
+      type: { $in: ["income", "expense"] },
       createdAt: { $gte: startOfMonth, $lte: endOfMonth }
     })
-      .populate({
-        path: "incomeCategoryId",
-        select: "name image"
-      })
-      .populate({
-        path: "expenseCategoryId",
-        select: "name image"
-      })
-      .sort({ createdAt: 1 }) // ⬅ oldest → newest
+      .populate("incomeCategoryId", "name image")
+      .populate("expenseCategoryId", "name image")
       .lean();
 
-    // 🔹 Add transactionType explicitly (already exists but for frontend safety)
     const formattedTransactions = transactions.map(item => ({
       ...item,
-      transactionType: item.type // income | expense | split
+      transactionType: item.type,
+      sortDate: item.createdAt
     }));
+
+    // 🔹 2️⃣ Split data (SplitModel)
+    const splits = await SplitModel.find({
+      userId: objectUserId,
+      paidStatus: "paid",
+      name: { $ne: "you" },
+      updatedAt: { $gte: startOfMonth, $lte: endOfMonth }
+    })
+      .populate({
+        path: "trnasactionId",
+        select: "note amount createdAt"
+      })
+      .lean();
+
+    const formattedSplits = splits.map(item => ({
+      _id: item._id,
+      transactionType: "split",
+      amount: item.splitAmount,
+      note: item.trnasactionId?.note || "",
+      name: item.name,
+      paidStatus: item.paidStatus,
+      sortDate: item.updatedAt
+    }));
+
+    // 🔹 3️⃣ Merge & sort (latest → oldest)
+    const allTransactions = [...formattedTransactions, ...formattedSplits].sort(
+      (a, b) => new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime()
+    );
 
     return res.status(200).json({
       success: true,
       month: now.getMonth() + 1,
       year: now.getFullYear(),
-      totalTransactions: formattedTransactions.length,
-      data: formattedTransactions
+      totalTransactions: allTransactions.length,
+      data: allTransactions
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 
 export const dashboard = async (req, res, next) => {
