@@ -586,6 +586,18 @@ export const verifyOtp = async (req, res, next) => {
         email: user.email,
         name: user.name,
         role: user.role, // ✅ ADD THIS
+        gender: user.gender || null,
+        dob: user.dob || null,
+        mobile: user.mobile || null,
+        address: user.address || null,
+
+        location: {
+          city: user.location?.city || null,
+          state: user.location?.state || null,
+        },
+
+        profilePic: user.profilePic || null,
+        isVerified: user.isVerified || false,
       },
       needsName: !user.name,
     });
@@ -623,6 +635,18 @@ export const addUserName = async (req, res, next) => {
         _id: user._id,
         email: user.email,
         name: user.name,
+        gender: user.gender || null,
+        dob: user.dob || null,
+        mobile: user.mobile || null,
+        address: user.address || null,
+
+        location: {
+          city: user.location?.city || null,
+          state: user.location?.state || null,
+        },
+
+        profilePic: user.profilePic || null,
+        isVerified: user.isVerified || false,
       },
     });
   } catch (error) {
