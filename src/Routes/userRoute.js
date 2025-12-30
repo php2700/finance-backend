@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authentication } from '../Middleware/authenticate.js';
 // import { authorization } from "../Middleware/authorize.js";
-import { AddExpense, AddIncome, AddSplit, dashboard, downloadCsv, getSplit, monthTransaction, transaction, updateSplit } from '../Controller/userController.js';
+import { AddExpense, AddIncome, AddSplit, dashboard, downloadCsv, getSplit, monthTransaction, splitTransaction, transaction, updateSplit } from '../Controller/userController.js';
 import { getAllUsers } from '../Controller/userController.js';
 import upload from '../Middleware/upload.js';
 import {
@@ -20,10 +20,10 @@ import { authorization } from '../Middleware/authorize.js';
 
 const userRouter = Router();
 
-userRouter.get('/download-csv/:userId',authentication,authorization(['user']),downloadCsv)
-userRouter.get('/month-transaction/:userId',authentication,authorization(['user']),monthTransaction)
-userRouter.get('/transaction/:userId',authentication,authorization(['user','admin']), transaction);
-userRouter.get('/dashboard/:userId',authentication,authorization(['user']), dashboard);
+userRouter.get('/download-csv/:userId', authentication, authorization(['user']), downloadCsv)
+userRouter.get('/month-transaction/:userId', authentication, authorization(['user']), monthTransaction)
+userRouter.get('/transaction/:userId', authentication, authorization(['user', 'admin']), transaction);
+userRouter.get('/dashboard/:userId', authentication, authorization(['user']), dashboard);
 
 /*income*/
 userRouter.post(
@@ -48,6 +48,7 @@ userRouter.get(
   authorization(['user', 'admin']),
   getSplit
 );
+userRouter.get('/split-transaction/:transactionId', authentication,authorization(['user', 'admin']),splitTransaction)
 userRouter.patch(
   '/split',
   authentication,
@@ -61,7 +62,8 @@ userRouter.post(
   AddSplit
 );
 
-userRouter.get('/', getAllUsers);
+userRouter.get('/',authentication,
+  authorization(['admin']),  getAllUsers);
 userRouter.post('/send-otp', sendOtp);
 userRouter.post('/verify-otp', verifyOtp);
 userRouter.post('/add-name', authentication, addUserName);

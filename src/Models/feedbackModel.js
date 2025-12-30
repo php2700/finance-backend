@@ -29,3 +29,33 @@ const feedbackSchema = new mongoose.Schema(
 
 const Feedback = mongoose.model('Feedback', feedbackSchema);
 export default Feedback;
+
+
+
+
+const privacyPolicySchema = new mongoose.Schema(
+  {
+    data: {
+      type: String,
+      required: true,
+    }
+
+  },
+  { timestamps: true }
+);
+
+export const PrivacyPolicyModel = mongoose.model('privacyPolicy', privacyPolicySchema);
+
+
+const aboutUsSchema = new mongoose.Schema(
+  {
+    data: {
+      type: String,
+      required: true,
+    }
+
+  },
+  { timestamps: true }
+);
+
+export const AboutUsModel = mongoose.model('aboutus', aboutUsSchema);

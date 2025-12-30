@@ -481,11 +481,35 @@ export const updateSplit = async (req, res, next) => {
   }
 };
 
+
+export const splitTransaction = async (req, res, next) => {
+  try {
+    const { transactionId } = req.params;
+
+    const transaction = await SplitModel.find({ trnasactionId: transactionId });
+
+    if (!transaction?.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Transaction not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: transaction
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 export const AddSplit = async (req, res, next) => {
   try {
     const { userId, amount, note, type, splitData } = req.body;
 
-    // 1️⃣ Create transaction
     const transaction = await TransactionModel.create({
       userId,
       amount,
@@ -493,16 +517,14 @@ export const AddSplit = async (req, res, next) => {
       type: type
     });
 
-    // 2️⃣ Prepare split documents
     const splitDocs = splitData.map(item => ({
-      trnasactionId: transaction._id, // typo kept as per schema
+      trnasactionId: transaction._id,
       name: item.name,
       userId: userId,
       splitAmount: item.splitAmount,
       paidStatus: item.paidStatus
     }));
 
-    // 3️⃣ Insert all split users
     await SplitModel.insertMany(splitDocs);
 
     return res.status(201).json({
