@@ -1,4 +1,7 @@
-import IncomeModel, { ExpenseModel, SplitModel } from '../Models/transaction.js';
+import IncomeModel, {
+  ExpenseModel,
+  SplitModel,
+} from '../Models/transaction.js';
 import { isValidEmail } from '../utils/validateEmail.js';
 import User from '../Models/userModel.js';
 import { generateOtp } from '../utils/generateOtp.js';
@@ -6,8 +9,6 @@ import { sendOtpMail } from '../utils/sendMail.js';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET_KEY } from '../envconfig.js';
 import mongoose from 'mongoose';
-
-
 
 export const AddIncome = async (req, res, next) => {
   try {
@@ -23,7 +24,6 @@ export const AddIncome = async (req, res, next) => {
   }
 };
 
-
 export const transaction = async (req, res, next) => {
   try {
     const { transactionType } = req.query;
@@ -31,66 +31,67 @@ export const transaction = async (req, res, next) => {
 
     const objectUserId = new mongoose.Types.ObjectId(userId);
 
-    if (transactionType === "income") {
+    if (transactionType === 'income') {
       const incomeTransaction = await IncomeModel.find({
-        userId: objectUserId
+        userId: objectUserId,
       })
-        .populate("incomeCategoryId")
+        .populate('incomeCategoryId')
         .sort({ createdAt: -1 });
 
       return res.status(200).json({
         success: true,
-        data: incomeTransaction
+        data: incomeTransaction,
       });
     }
 
-    if (transactionType === "expense") {
+    if (transactionType === 'expense') {
       const expenseTransaction = await ExpenseModel.find({
-        userId: objectUserId
-      }).populate("expenseCategoryId").sort({ createdAt: -1 });
+        userId: objectUserId,
+      })
+        .populate('expenseCategoryId')
+        .sort({ createdAt: -1 });
 
       return res.status(200).json({
         success: true,
-        data: expenseTransaction
+        data: expenseTransaction,
       });
     }
-
 
     const [income, expense] = await Promise.all([
       IncomeModel.find({ userId: objectUserId })
         .populate({
-          path: "incomeCategoryId",
-          select: "name image"
+          path: 'incomeCategoryId',
+          select: 'name image',
         })
         .lean(),
 
       ExpenseModel.find({ userId: objectUserId })
         .populate({
-          path: "expenseCategoryId",
-          select: "name image"
+          path: 'expenseCategoryId',
+          select: 'name image',
         })
-        .lean()
+        .lean(),
     ]);
 
-    const incomeWithType = income.map(item => ({
+    const incomeWithType = income.map((item) => ({
       ...item,
-      transactionType: "income"
+      transactionType: 'income',
     }));
 
-    const expenseWithType = expense.map(item => ({
+    const expenseWithType = expense.map((item) => ({
       ...item,
-      transactionType: "expense"
+      transactionType: 'expense',
     }));
 
-    const allTransactions = [...incomeWithType, ...expenseWithType]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
+    const allTransactions = [...incomeWithType, ...expenseWithType].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
     return res.status(200).json({
       success: true,
-      data: allTransactions
+      data: allTransactions,
     });
-
   } catch (error) {
     next(error);
   }
@@ -104,65 +105,61 @@ export const monthTransaction = async (req, res, next) => {
     // 🔹 Current month boundaries
     const now = new Date();
 
-    const startOfMonth = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1
-    );
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const endOfMonth = new Date(
       now.getFullYear(),
       now.getMonth() + 1,
       0,
-      23, 59, 59, 999
+      23,
+      59,
+      59,
+      999
     );
 
     // 🔹 Fetch both sorted by insertion time
     const [income, expense] = await Promise.all([
       IncomeModel.find({
         userId: objectUserId,
-        date: { $gte: startOfMonth, $lte: endOfMonth }
+        date: { $gte: startOfMonth, $lte: endOfMonth },
       })
-        .populate("incomeCategoryId", "name image")
+        .populate('incomeCategoryId', 'name image')
         .sort({ createdAt: 1 }) // ⬅ oldest → newest
         .lean(),
 
       ExpenseModel.find({
         userId: objectUserId,
-        date: { $gte: startOfMonth, $lte: endOfMonth }
+        date: { $gte: startOfMonth, $lte: endOfMonth },
       })
-        .populate("expenseCategoryId", "name image")
+        .populate('expenseCategoryId', 'name image')
         .sort({ createdAt: 1 }) // ⬅ oldest → newest
-        .lean()
+        .lean(),
     ]);
 
     // 🔹 Add transaction type
-    const incomeWithType = income.map(item => ({
+    const incomeWithType = income.map((item) => ({
       ...item,
-      transactionType: "income"
+      transactionType: 'income',
     }));
 
-    const expenseWithType = expense.map(item => ({
+    const expenseWithType = expense.map((item) => ({
       ...item,
-      transactionType: "expense"
+      transactionType: 'expense',
     }));
 
     // 🔹 Merge WITHOUT sorting again
-    const allTransactions = [...incomeWithType, ...expenseWithType]
-      .sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() -
-          new Date(b.createdAt).getTime()
-      );
+    const allTransactions = [...incomeWithType, ...expenseWithType].sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
 
     return res.status(200).json({
       success: true,
       month: now.getMonth() + 1,
       year: now.getFullYear(),
       totalTransactions: allTransactions.length,
-      data: allTransactions
+      data: allTransactions,
     });
-
   } catch (error) {
     next(error);
   }
@@ -176,16 +173,16 @@ export const dashboard = async (req, res, next) => {
     const [incomeAgg, expenseAgg, splitAgg] = await Promise.all([
       IncomeModel.aggregate([
         { $match: { userId: objectUserId } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
+        { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       ExpenseModel.aggregate([
         { $match: { userId: objectUserId } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
+        { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       SplitModel.aggregate([
         { $match: { userId: objectUserId } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-      ])
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
     ]);
 
     const totalIncome = incomeAgg[0]?.total || 0;
@@ -195,48 +192,37 @@ export const dashboard = async (req, res, next) => {
     const total = totalIncome - totalExpense - totalSplit;
 
     const percentage =
-      totalIncome > 0
-        ? Number(((total / totalIncome) * 100).toFixed(2))
-        : 0;
+      totalIncome > 0 ? Number(((total / totalIncome) * 100).toFixed(2)) : 0;
 
-    const percentStatus = percentage >= 0 ? "positive" : "negative";
-
+    const percentStatus = percentage >= 0 ? 'positive' : 'negative';
 
     const now = new Date();
 
-    const startOfMonth = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1
-    );
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const startOfNextMonth = new Date(
-      now.getFullYear(),
-      now.getMonth() + 1,
-      1
-    );
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const currentMonthMatch = {
       userId: objectUserId,
       createdAt: {
         $gte: startOfMonth,
-        $lt: startOfNextMonth
-      }
+        $lt: startOfNextMonth,
+      },
     };
 
     const [incomeMonth, expenseMonth, splitMonth] = await Promise.all([
       IncomeModel.aggregate([
         { $match: currentMonthMatch },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
+        { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       ExpenseModel.aggregate([
         { $match: currentMonthMatch },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
+        { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       SplitModel.aggregate([
         { $match: currentMonthMatch },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-      ])
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
     ]);
 
     const currentMonthIncome = incomeMonth[0]?.total || 0;
@@ -248,13 +234,11 @@ export const dashboard = async (req, res, next) => {
 
     const currentMonthPercentage =
       currentMonthIncome > 0
-        ? Number(
-          ((currentMonthTotal / currentMonthIncome) * 100).toFixed(2)
-        )
+        ? Number(((currentMonthTotal / currentMonthIncome) * 100).toFixed(2))
         : 0;
 
     const currentMonthStatus =
-      currentMonthPercentage >= 0 ? "positive" : "negative";
+      currentMonthPercentage >= 0 ? 'positive' : 'negative';
 
     return res.status(200).json({
       success: true,
@@ -266,7 +250,7 @@ export const dashboard = async (req, res, next) => {
           percentStatus,
           totalIncome,
           totalExpense,
-          totalSplit
+          totalSplit,
         },
         currentMonth: {
           income: currentMonthIncome,
@@ -274,17 +258,14 @@ export const dashboard = async (req, res, next) => {
           split: currentMonthSplit,
           total: currentMonthTotal,
           percentage: currentMonthPercentage,
-          percentStatus: currentMonthStatus
-        }
-      }
+          percentStatus: currentMonthStatus,
+        },
+      },
     });
-
   } catch (error) {
     next(error);
   }
 };
-
-
 
 export const AddExpense = async (req, res, next) => {
   try {
@@ -305,29 +286,27 @@ export const getSplit = async (req, res, next) => {
     const { userId } = req.params;
 
     const splitData = await SplitModel.find({
-      userId: new mongoose.Types.ObjectId(userId)
+      userId: new mongoose.Types.ObjectId(userId),
     })
       .sort({ createdAt: -1 })
       .lean();
 
     const unpaidCount = splitData.reduce((total, item) => {
-      const unpaidInItem = item.splitData?.filter(
-        split => split.paidStatus === "unpaid"
-      ).length || 0;
+      const unpaidInItem =
+        item.splitData?.filter((split) => split.paidStatus === 'unpaid')
+          .length || 0;
       return total + unpaidInItem;
     }, 0);
 
     return res.status(200).json({
       success: true,
       unpaidCount,
-      data: splitData
+      data: splitData,
     });
-
   } catch (error) {
     next(error);
   }
 };
-
 
 export const updateSplit = async (req, res, next) => {
   try {
@@ -336,36 +315,34 @@ export const updateSplit = async (req, res, next) => {
     const result = await SplitModel.findOneAndUpdate(
       {
         userId: new mongoose.Types.ObjectId(userId),
-        "splitData._id": new mongoose.Types.ObjectId(splitId)
+        'splitData._id': new mongoose.Types.ObjectId(splitId),
       },
       {
         $set: {
-          "splitData.$.paidStatus": paidStatus
-        }
+          'splitData.$.paidStatus': paidStatus,
+        },
       },
       {
-        new: true
+        new: true,
       }
     );
 
     if (!result) {
       return res.status(404).json({
         success: false,
-        message: "Split data not found"
+        message: 'Split data not found',
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Paid status updated successfully",
-      data: result
+      message: 'Paid status updated successfully',
+      data: result,
     });
-
   } catch (error) {
     next(error);
   }
 };
-
 
 export const AddSplit = async (req, res, next) => {
   try {
@@ -495,11 +472,24 @@ export const addUserName = async (req, res, next) => {
 
 export const getAllUsers = async (req, res, next) => {
   try {
-    // console.log('🔥 GET /api/user hit');
-    const users = await User.find().select('-otp -otpExpire');
+    const users = await User.find()
+      .select(
+        'name email role profilePic gender dob mobile address location createdAt'
+      )
+      .lean();
+
+    // 🔥 Ensure location always exists (frontend safe)
+    const formattedUsers = users.map((u) => ({
+      ...u,
+      location: {
+        city: u.location?.city || '',
+        state: u.location?.state || '',
+      },
+    }));
+
     res.status(200).json({
       success: true,
-      users,
+      users: formattedUsers,
     });
   } catch (err) {
     next(err);
