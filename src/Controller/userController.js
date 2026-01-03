@@ -69,13 +69,12 @@ export const transaction = async (req, res, next) => {
       });
     }
 
-
     const splits = await SplitModel.aggregate([
       {
         $match: {
           userId: objectUserId,
-          paidStatus: "paid",
-        }
+          paidStatus: 'paid',
+        },
       },
       {
         $lookup: {
@@ -88,13 +87,13 @@ export const transaction = async (req, res, next) => {
       { $unwind: '$transaction' },
       {
         $addFields: {
-          type: "split",
-          amount: "$splitAmount",
-          note: "$transaction.note",
-          sortDate: "$updatedAt"
-        }
+          type: 'split',
+          amount: '$splitAmount',
+          note: '$transaction.note',
+          sortDate: '$updatedAt',
+        },
       },
-      { $sort: { sortDate: -1 } }
+      { $sort: { sortDate: -1 } },
     ]);
 
     const transactions = await TransactionModel.find({
@@ -111,9 +110,9 @@ export const transaction = async (req, res, next) => {
       })
       .lean();
 
-    const transactionsWithSortDate = transactions.map(txn => ({
+    const transactionsWithSortDate = transactions.map((txn) => ({
       ...txn,
-      sortDate: txn.createdAt
+      sortDate: txn.createdAt,
     }));
 
     const allTransactions = [...transactionsWithSortDate, ...splits].sort(
@@ -165,8 +164,8 @@ export const downloadCsv = async (req, res, next) => {
 
     const splits = await SplitModel.find({
       userId: objectUserId,
-      paidStatus: "paid",
-      ...(startDate && endDate && { updatedAt: dateFilter })
+      paidStatus: 'paid',
+      ...(startDate && endDate && { updatedAt: dateFilter }),
     })
       .populate({
         path: 'trnasactionId',
@@ -242,8 +241,8 @@ export const monthTransaction = async (req, res, next) => {
     // 🔹 2️⃣ Split data (SplitModel)
     const splits = await SplitModel.find({
       userId: objectUserId,
-      paidStatus: "paid",
-      updatedAt: { $gte: startOfMonth, $lte: endOfMonth }
+      paidStatus: 'paid',
+      updatedAt: { $gte: startOfMonth, $lte: endOfMonth },
     })
       .populate({
         path: 'trnasactionId',
@@ -442,7 +441,6 @@ export const AddExpense = async (req, res, next) => {
   }
 };
 
-
 export const getSplit = async (req, res, next) => {
   try {
     const { userId } = req.params;
@@ -452,26 +450,44 @@ export const getSplit = async (req, res, next) => {
       {
         $match: {
           userId: objectUserId,
-          type: "split",
+          type: 'split',
         },
       },
       {
         $lookup: {
-          from: "splits",
-          localField: "_id",
-          foreignField: "trnasactionId",
-          as: "splits",
+          from: 'splits',
+          localField: '_id',
+          foreignField: 'trnasactionId',
+          as: 'splits',
         },
       },
+      {
+        $addFields: {
+          remainingAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$splits',
+                    as: 's',
+                    cond: { $eq: ['$$s.paidStatus', 'unpaid'] },
+                  },
+                },
+                as: 'u',
+                in: '$$u.splitAmount',
+              },
+            },
+          },
+        },
+      },
+
       {
         $sort: { createdAt: -1 },
       },
     ]);
 
     const unpaidCount = splitData.reduce((count, txn) => {
-      const hasUnpaid = txn.splits.some(
-        (s) => s.paidStatus === "unpaid"
-      );
+      const hasUnpaid = txn.splits.some((s) => s.paidStatus === 'unpaid');
 
       return hasUnpaid ? count + 1 : count;
     }, 0);
