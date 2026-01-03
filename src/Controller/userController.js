@@ -1,4 +1,8 @@
-import IncomeModel, { ExpenseModel, SplitModel, TransactionModel } from '../Models/transaction.js';
+import IncomeModel, {
+  ExpenseModel,
+  SplitModel,
+  TransactionModel,
+} from '../Models/transaction.js';
 import { isValidEmail } from '../utils/validateEmail.js';
 import User from '../Models/userModel.js';
 import { generateOtp } from '../utils/generateOtp.js';
@@ -6,8 +10,7 @@ import { sendOtpMail } from '../utils/sendMail.js';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET_KEY } from '../envconfig.js';
 import mongoose from 'mongoose';
-import { Parser } from "json2csv";
-
+import { Parser } from 'json2csv';
 
 export const AddIncome = async (req, res, next) => {
   try {
@@ -30,10 +33,10 @@ export const transaction = async (req, res, next) => {
 
     const objectUserId = new mongoose.Types.ObjectId(userId);
 
-    if (transactionType === "income") {
+    if (transactionType === 'income') {
       const incomeTransactions = await TransactionModel.find({
         userId: objectUserId,
-        type: "income"
+        type: 'income',
       })
         .populate({
           path: 'incomeCategoryId',
@@ -44,14 +47,14 @@ export const transaction = async (req, res, next) => {
 
       return res.status(200).json({
         success: true,
-        data: incomeTransactions
+        data: incomeTransactions,
       });
     }
 
-    if (transactionType === "expense") {
+    if (transactionType === 'expense') {
       const expenseTransactions = await TransactionModel.find({
         userId: objectUserId,
-        type: "expense"
+        type: 'expense',
       })
         .populate({
           path: 'expenseCategoryId',
@@ -62,7 +65,7 @@ export const transaction = async (req, res, next) => {
 
       return res.status(200).json({
         success: true,
-        data: expenseTransactions
+        data: expenseTransactions,
       });
     }
 
@@ -70,41 +73,40 @@ export const transaction = async (req, res, next) => {
       {
         $match: {
           userId: objectUserId,
-          paidStatus: "paid",
-          name: { $ne: "you" }
-        }
+          paidStatus: 'paid',
+          name: { $ne: 'you' },
+        },
       },
       {
         $lookup: {
-          from: "transactions",
-          localField: "trnasactionId",
-          foreignField: "_id",
-          as: "transaction"
-        }
+          from: 'transactions',
+          localField: 'trnasactionId',
+          foreignField: '_id',
+          as: 'transaction',
+        },
       },
-      { $unwind: "$transaction" },
+      { $unwind: '$transaction' },
       {
         $addFields: {
-          type: "split",
-          amount: "$splitAmount",
-          note: "$transaction.note",
-          sortDate: "$updatedAt"
-        }
-      }
+          type: 'split',
+          amount: '$splitAmount',
+          note: '$transaction.note',
+          sortDate: '$updatedAt',
+        },
+      },
     ]);
-
 
     const transactions = await TransactionModel.find({
       userId: objectUserId,
-      type: { $in: ["income", "expense"] }
+      type: { $in: ['income', 'expense'] },
     })
       .populate({
-        path: "incomeCategoryId",
-        select: "name image"
+        path: 'incomeCategoryId',
+        select: 'name image',
       })
       .populate({
-        path: "expenseCategoryId",
-        select: "name image"
+        path: 'expenseCategoryId',
+        select: 'name image',
       })
       .sort({ createdAt: -1 })
       .lean();
@@ -117,12 +119,10 @@ export const transaction = async (req, res, next) => {
       success: true,
       data: allTransactions,
     });
-
   } catch (error) {
     next(error);
   }
 };
-
 
 export const downloadCsv = async (req, res, next) => {
   try {
@@ -140,71 +140,67 @@ export const downloadCsv = async (req, res, next) => {
     /* 🔹 1. Income + Expense Transactions */
     const transactions = await TransactionModel.find({
       userId: objectUserId,
-      type: { $in: ["income", "expense"] },
-      ...(startDate && endDate && { createdAt: dateFilter })
+      type: { $in: ['income', 'expense'] },
+      ...(startDate && endDate && { createdAt: dateFilter }),
     })
-      .populate("incomeCategoryId", "name")
-      .populate("expenseCategoryId", "name")
+      .populate('incomeCategoryId', 'name')
+      .populate('expenseCategoryId', 'name')
       .lean();
 
-    const formattedTransactions = transactions.map(item => ({
+    const formattedTransactions = transactions.map((item) => ({
       date: item.createdAt,
       transactionType: item.type,
       amount: item.amount,
       category:
-        item.type === "income"
-          ? item.incomeCategoryId?.name || ""
-          : item.expenseCategoryId?.name || "",
-      note: item.note || ""
+        item.type === 'income'
+          ? item.incomeCategoryId?.name || ''
+          : item.expenseCategoryId?.name || '',
+      note: item.note || '',
     }));
 
     /* 🔹 2. Paid Split Transactions (name !== "you") */
     const splits = await SplitModel.find({
       userId: objectUserId,
-      paidStatus: "paid",
-      name: { $ne: "you" },
-      ...(startDate && endDate && { updatedAt: dateFilter })
+      paidStatus: 'paid',
+      name: { $ne: 'you' },
+      ...(startDate && endDate && { updatedAt: dateFilter }),
     })
       .populate({
-        path: "trnasactionId",
-        select: "note"
+        path: 'trnasactionId',
+        select: 'note',
       })
       .lean();
 
-    const formattedSplits = splits.map(item => ({
+    const formattedSplits = splits.map((item) => ({
       date: item.updatedAt,
-      transactionType: "split",
+      transactionType: 'split',
       amount: item.splitAmount,
       category: item.name, // person name
-      note: item.trnasactionId?.note || ""
+      note: item.trnasactionId?.note || '',
     }));
 
     const allData = [...formattedTransactions, ...formattedSplits].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
-
     const fields = [
-      { label: "Date", value: "date" },
-      { label: "Type", value: "transactionType" },
-      { label: "Amount", value: "amount" },
-      { label: "Category / Name", value: "category" },
-      { label: "Note", value: "note" }
+      { label: 'Date', value: 'date' },
+      { label: 'Type', value: 'transactionType' },
+      { label: 'Amount', value: 'amount' },
+      { label: 'Category / Name', value: 'category' },
+      { label: 'Note', value: 'note' },
     ];
 
     const parser = new Parser({ fields });
     const csv = parser.parse(allData);
 
-    res.header("Content-Type", "text/csv");
+    res.header('Content-Type', 'text/csv');
     res.attachment(`transactions_${Date.now()}.csv`);
     return res.send(csv);
-
   } catch (error) {
     next(error);
   }
 };
-
-
 
 export const monthTransaction = async (req, res, next) => {
   try {
@@ -227,40 +223,40 @@ export const monthTransaction = async (req, res, next) => {
     // 🔹 1️⃣ Income + Expense (TransactionModel)
     const transactions = await TransactionModel.find({
       userId: objectUserId,
-      type: { $in: ["income", "expense"] },
-      createdAt: { $gte: startOfMonth, $lte: endOfMonth }
+      type: { $in: ['income', 'expense'] },
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth },
     })
-      .populate("incomeCategoryId", "name image")
-      .populate("expenseCategoryId", "name image")
+      .populate('incomeCategoryId', 'name image')
+      .populate('expenseCategoryId', 'name image')
       .lean();
 
-    const formattedTransactions = transactions.map(item => ({
+    const formattedTransactions = transactions.map((item) => ({
       ...item,
       transactionType: item.type,
-      sortDate: item.createdAt
+      sortDate: item.createdAt,
     }));
 
     // 🔹 2️⃣ Split data (SplitModel)
     const splits = await SplitModel.find({
       userId: objectUserId,
-      paidStatus: "paid",
-      name: { $ne: "you" },
-      updatedAt: { $gte: startOfMonth, $lte: endOfMonth }
+      paidStatus: 'paid',
+      name: { $ne: 'you' },
+      updatedAt: { $gte: startOfMonth, $lte: endOfMonth },
     })
       .populate({
-        path: "trnasactionId",
-        select: "note amount createdAt"
+        path: 'trnasactionId',
+        select: 'note amount createdAt',
       })
       .lean();
 
-    const formattedSplits = splits.map(item => ({
+    const formattedSplits = splits.map((item) => ({
       _id: item._id,
-      transactionType: "split",
+      transactionType: 'split',
       amount: item.splitAmount,
-      note: item.trnasactionId?.note || "",
+      note: item.trnasactionId?.note || '',
       name: item.name,
       paidStatus: item.paidStatus,
-      sortDate: item.updatedAt
+      sortDate: item.updatedAt,
     }));
 
     // 🔹 3️⃣ Merge & sort (latest → oldest)
@@ -273,14 +269,12 @@ export const monthTransaction = async (req, res, next) => {
       month: now.getMonth() + 1,
       year: now.getFullYear(),
       totalTransactions: allTransactions.length,
-      data: allTransactions
+      data: allTransactions,
     });
   } catch (error) {
     next(error);
   }
 };
-
-
 
 export const dashboard = async (req, res, next) => {
   try {
@@ -290,79 +284,120 @@ export const dashboard = async (req, res, next) => {
     const [incomeAgg, expenseAgg, splitSum, splitAgg] = await Promise.all([
       // Total income
       TransactionModel.aggregate([
-        { $match: { userId: objectUserId, type: "income" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
+        { $match: { userId: objectUserId, type: 'income' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
 
       // Total expense
       TransactionModel.aggregate([
-        { $match: { userId: objectUserId, type: "expense" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
+        { $match: { userId: objectUserId, type: 'expense' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
 
       TransactionModel.aggregate([
-        { $match: { userId: objectUserId, type: "split" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
+        { $match: { userId: objectUserId, type: 'split' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       SplitModel.aggregate([
-        { $match: { userId: objectUserId, paidStatus: "paid", name: { $ne: "you" } } },
-        { $group: { _id: null, totalPaidSplitAmount: { $sum: "$splitAmount" } } }
-      ])
-
+        {
+          $match: {
+            userId: objectUserId,
+            paidStatus: 'paid',
+            name: { $ne: 'you' },
+          },
+        },
+        {
+          $group: { _id: null, totalPaidSplitAmount: { $sum: '$splitAmount' } },
+        },
+      ]),
     ]);
 
     const totalIncome = incomeAgg[0]?.total || 0;
     const totalExpense = expenseAgg[0]?.total || 0;
-    const totalSplit = splitSum[0]?.total || 0
+    const totalSplit = splitSum[0]?.total || 0;
     const totalPaidSplitAmount = splitAgg[0]?.totalPaidSplitAmount || 0;
 
-
-    const income = totalIncome + totalPaidSplitAmount
+    const income = totalIncome + totalPaidSplitAmount;
     const expnese = totalExpense + totalSplit;
     const overallTotal = income - expnese;
-    const overallPercentage = income > 0 ? Number(((overallTotal / income) * 100).toFixed(2)) : 0;
-    const overallStatus = overallPercentage >= 0 ? "positive" : "negative";
+    const overallPercentage =
+      income > 0 ? Number(((overallTotal / income) * 100).toFixed(2)) : 0;
+    const overallStatus = overallPercentage >= 0 ? 'positive' : 'negative';
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const currentMonthMatch = {
-      createdAt: { $gte: startOfMonth, $lt: startOfNextMonth }
+      createdAt: { $gte: startOfMonth, $lt: startOfNextMonth },
     };
 
-    const [incomeMonth, expenseMonth, splitAmount, splitMonth] = await Promise.all([
-      TransactionModel.aggregate([
-        { $match: { ...currentMonthMatch, userId: objectUserId, type: "income" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-      ]),
-      TransactionModel.aggregate([
-        { $match: { ...currentMonthMatch, userId: objectUserId, type: "expense" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-      ]),
-      TransactionModel.aggregate([
-        { $match: { ...currentMonthMatch, userId: objectUserId, type: "split" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-      ]),
-      SplitModel.aggregate([
-        { $match: { ...currentMonthMatch, userId: objectUserId, paidStatus: "paid", name: { $ne: "you" } } },
-        { $group: { _id: null, totalPaidSplitAmount: { $sum: "$splitAmount" } } }
-      ])
-    ]);
+    const [incomeMonth, expenseMonth, splitAmount, splitMonth] =
+      await Promise.all([
+        TransactionModel.aggregate([
+          {
+            $match: {
+              ...currentMonthMatch,
+              userId: objectUserId,
+              type: 'income',
+            },
+          },
+          { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+        TransactionModel.aggregate([
+          {
+            $match: {
+              ...currentMonthMatch,
+              userId: objectUserId,
+              type: 'expense',
+            },
+          },
+          { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+        TransactionModel.aggregate([
+          {
+            $match: {
+              ...currentMonthMatch,
+              userId: objectUserId,
+              type: 'split',
+            },
+          },
+          { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+        SplitModel.aggregate([
+          {
+            $match: {
+              ...currentMonthMatch,
+              userId: objectUserId,
+              paidStatus: 'paid',
+              name: { $ne: 'you' },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              totalPaidSplitAmount: { $sum: '$splitAmount' },
+            },
+          },
+        ]),
+      ]);
 
     const currentMonthIncome = incomeMonth[0]?.total || 0;
     const currentMonthExpense = expenseMonth[0]?.total || 0;
-    const currentMonthPaidSplitAmount = splitMonth[0]?.totalPaidSplitAmount || 0;
+    const currentMonthPaidSplitAmount =
+      splitMonth[0]?.totalPaidSplitAmount || 0;
     const splitMonthAmount = splitAmount[0]?.total || 0;
 
     const monthIncome = currentMonthIncome + currentMonthPaidSplitAmount;
-    const monthExpense = currentMonthExpense + splitMonthAmount
+    const monthExpense = currentMonthExpense + splitMonthAmount;
 
     const currentMonthTotal = monthIncome - monthExpense;
-    const currentMonthPercentage = monthIncome > 0
-      ? Number(((currentMonthTotal / monthIncome) * 100).toFixed(2))
-      : 0;
-    const currentMonthStatus = currentMonthPercentage >= 0 ? "positive" : "negative";
+    const currentMonthPercentage =
+      monthIncome > 0
+        ? Number(((currentMonthTotal / monthIncome) * 100).toFixed(2))
+        : 0;
+    const currentMonthStatus =
+      currentMonthPercentage >= 0 ? 'positive' : 'negative';
 
     return res.status(200).json({
       success: true,
@@ -374,7 +409,7 @@ export const dashboard = async (req, res, next) => {
           percentStatus: overallStatus,
           income,
           expnese,
-          totalPaidSplitAmount
+          totalPaidSplitAmount,
         },
         currentMonth: {
           income: monthIncome,
@@ -390,10 +425,6 @@ export const dashboard = async (req, res, next) => {
     next(error);
   }
 };
-
-
-
-
 
 export const AddExpense = async (req, res, next) => {
   try {
@@ -418,27 +449,43 @@ export const getSplit = async (req, res, next) => {
       {
         $match: {
           userId: objectUserId,
-          type: "split"
-        }
+          type: 'split',
+        },
       },
 
       {
         $lookup: {
-          from: "splits",
-          localField: "_id",
-          foreignField: "trnasactionId",
-          as: "splits"
-        }
+          from: 'splits',
+          localField: '_id',
+          foreignField: 'trnasactionId',
+          as: 'splits',
+        },
       },
+      // {
+      //   $addFields: {
+      //     remainingAmount: {
+      //       $sum: {
+      //         $map: {
+      //           input: {
+      //             $filter: {
+      //               input: '$splits',
+      //               as: 's',
+      //               cond: { $eq: ['$$s.paidStatus', 'unpaid'] },
+      //             },
+      //           },
+      //           as: 'u',
+      //           in: '$$u.splitAmount',
+      //         },
+      //       },
+      //     },
+      //   },
+      // },
 
-      { $sort: { createdAt: -1 } }
+      { $sort: { createdAt: -1 } },
     ]);
 
-
     const unpaidCount = splitData.reduce((count, txn) => {
-      const unpaid = txn.splits.filter(
-        s => s.paidStatus === "unpaid"
-      ).length;
+      const unpaid = txn.splits.filter((s) => s.paidStatus === 'unpaid').length;
       return count + unpaid;
     }, 0);
 
@@ -451,8 +498,6 @@ export const getSplit = async (req, res, next) => {
     next(error);
   }
 };
-
-
 
 export const updateSplit = async (req, res, next) => {
   try {
@@ -481,7 +526,6 @@ export const updateSplit = async (req, res, next) => {
   }
 };
 
-
 export const splitTransaction = async (req, res, next) => {
   try {
     const { transactionId } = req.params;
@@ -491,20 +535,18 @@ export const splitTransaction = async (req, res, next) => {
     if (!transaction?.length) {
       return res.status(404).json({
         success: false,
-        message: "Transaction not found"
+        message: 'Transaction not found',
       });
     }
 
     return res.status(200).json({
       success: true,
-      data: transaction
+      data: transaction,
     });
-
   } catch (error) {
     next(error);
   }
 };
-
 
 export const AddSplit = async (req, res, next) => {
   try {
@@ -514,31 +556,29 @@ export const AddSplit = async (req, res, next) => {
       userId,
       amount,
       note,
-      type: type
+      type: type,
     });
 
-    const splitDocs = splitData.map(item => ({
+    const splitDocs = splitData.map((item) => ({
       trnasactionId: transaction._id,
       name: item.name,
       userId: userId,
       splitAmount: item.splitAmount,
-      paidStatus: item.paidStatus
+      paidStatus: item.paidStatus,
     }));
 
     await SplitModel.insertMany(splitDocs);
 
     return res.status(201).json({
       success: true,
-      message: "Split transaction added successfully",
-      transactionId: transaction._id, userId
+      message: 'Split transaction added successfully',
+      transactionId: transaction._id,
+      userId,
     });
-
   } catch (error) {
     next(error);
   }
 };
-
-
 
 export const sendOtp = async (req, res, next) => {
   try {
